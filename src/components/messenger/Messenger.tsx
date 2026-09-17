@@ -157,6 +157,14 @@ export function Messenger({
     } catch (caught) { setError(caught instanceof ApiClientError ? caught.message : "Unable to start the conference."); }
   }
 
+  async function restartMeeting() {
+    if (!activeConversation?.groupId || !activeMeeting) return;
+    try {
+      await apiFetch(`/api/video-meetings/${activeMeeting.id}?action=end`, { method: "POST" });
+      await startMeeting(activeMeeting.type === "voice" ? "voice" : "video");
+    } catch (caught) { setError(caught instanceof ApiClientError ? caught.message : "Unable to restart the conference."); }
+  }
+
   const filteredConversations = useMemo(() => {
     const needle = searchTerm.trim().toLowerCase();
     if (!needle) return conversations;
@@ -690,7 +698,7 @@ export function Messenger({
                 </p>
               </div>
               {activeConversation.groupId ? <div className="flex shrink-0 gap-1">
-                {activeMeeting ? <button type="button" className="btn-primary text-xs" onClick={() => window.location.assign(`/app/groups/${activeConversation.groupId}/video-call/${activeMeeting.id}`)}>● Live call · Join</button> : <>
+                {activeMeeting ? <><button type="button" className="btn-primary text-xs" onClick={() => window.location.assign(`/app/groups/${activeConversation.groupId}/video-call/${activeMeeting.id}`)}>● Live call · Join</button><button type="button" className="btn-ghost text-xs" onClick={() => void restartMeeting()}>Restart</button></> : <>
                   <button type="button" className="btn-ghost text-xs" onClick={() => void startMeeting("voice")}>Voice call</button>
                   <button type="button" className="btn-primary text-xs" onClick={() => void startMeeting("video")}>Video call</button>
                 </>}

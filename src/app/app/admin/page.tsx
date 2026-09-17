@@ -12,9 +12,15 @@ export default function AdminPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("User#2026!");
   const [status, setStatus] = useState("Loading Cloudflare admin data…");
+  const [authorized, setAuthorized] = useState<boolean | null>(null);
 
   async function load() {
     try {
+      const me = await apiFetch<{ permissions?: string[]; canAdmin?: boolean; user?: { id: string } } & { id?: string }>("/api/users/me");
+      const permissions = me.permissions ?? [];
+      const allowed = Boolean(me.canAdmin || permissions.includes("*") || permissions.includes("users.view") || permissions.includes("groups.view"));
+      setAuthorized(allowed);
+      if (!allowed) { setStatus("Administrator access required."); return; }
       const [summary, users] = await Promise.all([
         apiFetch<{ overview: Overview }>("/api/admin/overview"),
         apiFetch<{ users: Account[] }>("/api/admin/users"),
@@ -39,6 +45,7 @@ export default function AdminPage() {
     } catch (error) { setStatus(error instanceof Error ? error.message : "Could not create account"); }
   }
 
+  if (authorized === false) return <main className="mx-auto max-w-2xl p-8"><section className="panel p-6"><h1 className="text-xl font-semibold text-white">Administrator access required</h1><p className="mt-2 text-sm text-slate-400">Your account is not authorized to view the administration console.</p></section></main>;
   return <main className="mx-auto w-full max-w-6xl space-y-6 p-6 lg:p-10">
     <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">Cloudflare control plane</p><h1 className="mt-2 text-3xl font-semibold text-white">Admin panel</h1><p className="mt-2 text-sm text-slate-400">Accounts and messenger data are stored in the connected D1 database.</p></div>
     <p className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">{status}</p>
