@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS conversations (id TEXT PRIMARY KEY, type TEXT NOT NULL DEFAULT 'direct', title TEXT, created_by TEXT NOT NULL REFERENCES users(id), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS conversation_members (conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, role TEXT NOT NULL DEFAULT 'participant', PRIMARY KEY (conversation_id, user_id));
+ALTER TABLE messages ADD COLUMN conversation_id TEXT REFERENCES conversations(id);
+ALTER TABLE messages ADD COLUMN ciphertext_iv TEXT;
+ALTER TABLE messages ADD COLUMN sender_device_id TEXT;
+ALTER TABLE messages ADD COLUMN client_message_id TEXT;
+ALTER TABLE messages ADD COLUMN content_type TEXT NOT NULL DEFAULT 'text';
+ALTER TABLE messages ADD COLUMN status TEXT NOT NULL DEFAULT 'sent';
+CREATE INDEX IF NOT EXISTS idx_conversation_members_user ON conversation_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at);

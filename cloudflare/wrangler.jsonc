@@ -1,0 +1,15 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "demoo",
+  "account_id": "31bc12993ae04639246a2dd14279b297",
+  "compatibility_date": "2026-09-17",
+  "main": "worker.js",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "demooo",
+      "database_id": "aea3766b-c6bb-4eff-9be2-567aa0a31835",
+      "migrations_dir": "../migrations"
+    }
+  ]
+}

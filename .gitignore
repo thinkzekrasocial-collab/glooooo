@@ -1,0 +1,6 @@
+/dist/
+.vinext/
+.wrangler/
+node_modules/
+.next/
+*.tsbuildinfo

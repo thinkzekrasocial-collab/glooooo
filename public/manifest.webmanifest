@@ -1,0 +1,26 @@
+{
+  "name": "GlobeBridge Pathways Messenger",
+  "short_name": "GlobeBridge",
+  "description": "Administrator-provisioned, end-to-end encrypted messaging for GlobeBridge Pathways.",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#05070f",
+  "theme_color": "#05070f",
+  "categories": ["education", "social"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

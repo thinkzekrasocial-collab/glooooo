@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="GlobeBridge Pathways">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5b7cfa"/>
+      <stop offset="1" stop-color="#45e0b0"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#05070f"/>
+  <circle cx="256" cy="256" r="150" fill="none" stroke="url(#g)" stroke-width="26"/>
+  <path d="M106 256h300M256 106c58 44 92 96 92 150s-34 106-92 150c-58-44-92-96-92-150s34-106 92-150z" fill="none" stroke="url(#g)" stroke-width="20" stroke-linecap="round"/>
+  <circle cx="256" cy="256" r="26" fill="#45e0b0"/>
+</svg>
