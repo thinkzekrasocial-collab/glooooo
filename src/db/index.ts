@@ -8,7 +8,7 @@ const databaseUrl = process.env.DATABASE_URL;
 // unreachable build-only URL so the application can be compiled.
 const isBuildPhase =
   process.env.NEXT_PHASE === "phase-production-build" ||
-  (process.env.VERCEL === "1" && process.env.CI === "1");
+  process.env.VERCEL === "1";
 const connectionString = databaseUrl ?? (isBuildPhase ? "postgresql://build-only.invalid/globebridge" : undefined);
 
 if (!connectionString) throw new Error("DATABASE_URL is required at runtime");

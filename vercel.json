@@ -3,6 +3,6 @@
   "framework": "nextjs",
   "outputDirectory": ".next",
   "installCommand": "npm ci",
-  "buildCommand": "NEXT_PHASE=phase-production-build npm run build",
+  "buildCommand": "npm run build",
   "devCommand": "npm run dev"
 }
