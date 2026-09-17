@@ -24,7 +24,8 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
   // same-origin unless a separately deployed API is explicitly configured;
   // the old hard-coded Worker fallback caused successful logins to lose their
   // cookie on the subsequent `/api/users/me` request and created a login loop.
-  const configuredBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  const configuredBase =
+    process.env.NODE_ENV === "production" ? undefined : process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
   const apiBase = configuredBase ? configuredBase.replace(/\/$/, "") : "";
   const token = typeof window !== "undefined" ? window.localStorage.getItem("gb_token") : null;
   const response = await fetch(`${apiBase}${path}`, {
