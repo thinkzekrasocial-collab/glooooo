@@ -1,10 +1,7 @@
 import { LoginForm } from "@/components/auth/LoginForm";
 
-const CLOUDFLARE_ACCOUNTS = [
-  { email: "admin@globebridge.edu", name: "Cloudflare administrator", role: "admin", label: "Admin panel", password: "Admin#2026!" },
-  { email: "marcus.lee@globebridge.edu", name: "Marcus Lee", role: "member", label: "Messenger user", password: "User#2026!" },
-  { email: "alina.rahman@globebridge.edu", name: "Alina Rahman", role: "member", label: "Messenger user", password: "User#2026!" },
-];
+// Production never ships usernames or passwords in the client bundle.
+const CLOUDFLARE_ACCOUNTS: never[] = [];
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +28,7 @@ export default function LoginPage() {
           and expire automatically — there is no public sign-up form anywhere in this application.
         </p>
 
-        <LoginForm sandboxAccounts={CLOUDFLARE_ACCOUNTS} sandboxPassword="Admin#2026!" />
+        <LoginForm sandboxAccounts={CLOUDFLARE_ACCOUNTS} sandboxPassword="" />
       </section>
 
       <section className="w-full max-w-md space-y-4 lg:pt-6">

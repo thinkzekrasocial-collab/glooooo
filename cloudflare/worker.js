@@ -1,5 +1,7 @@
 const cors = {
-  "access-control-allow-origin": "*",
+  // The deployed frontend should be configured explicitly at the edge. The
+  // wildcard is intentionally removed from the production Worker contract.
+  "access-control-allow-origin": "https://demoo.shihab309kye.workers.dev",
   "access-control-allow-headers": "Content-Type, Authorization",
   "access-control-allow-methods": "GET, POST, PATCH, PUT, DELETE, OPTIONS",
   "access-control-max-age": "86400",
@@ -44,18 +46,16 @@ async function body(request) { try { return await request.json(); } catch { retu
 export default { async fetch(request, env) {
   const url = new URL(request.url);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
-  await seedAccounts(env);
+  // Demo data is opt-in. A production database must be provisioned by an
+  // administrator and must never be silently populated on the first request.
+  if (env.SEED_DEMO_DATA === "true") await seedAccounts(env);
   if (url.pathname === "/" && request.method === "GET") return new Response(html, { headers: { "content-type": "text/html;charset=UTF-8" } });
   if (url.pathname === "/health") return json({ ok: true, service: "globebridge-messenger", storage: "cloudflare-d1", messageStorage: "ciphertext-only" });
   if (!url.pathname.startsWith("/api/")) return json({ error: "Not found" }, 404);
   const path = url.pathname.slice(4);
-  if ((path === "/signup" || path === "/auth/signup") && request.method === "POST") {
-    const b = await body(request), email = String(b.email || "").trim().toLowerCase(), password = String(b.password || "");
-    if (!email || password.length < 8) return json({ error: "Email and password (8+ characters) are required." }, 422);
-    const id = crypto.randomUUID(), hash = await hashPassword(password);
-    try { await env.DB.prepare("insert into users(id,email,password_hash) values(?,?,?)").bind(id,email,hash).run(); } catch { return json({ error: "An account with that email already exists." }, 409); }
-    return await issue(env, id);
-  }
+  // Account creation is administrator-only. There is deliberately no public
+  // signup endpoint in production.
+  if (path === "/signup" || path === "/auth/signup") return json({ error: "Public registration is disabled." }, 404);
   if ((path === "/login" || path === "/auth/login") && request.method === "POST") {
     const b = await body(request), email = String(b.email || "").trim().toLowerCase(), user = await env.DB.prepare("select * from users where email=?").bind(email).first();
     if (!user || !(await verifyPassword(String(b.password || ""), user.password_hash))) return json({ error: "Invalid email or password." }, 401);
@@ -99,7 +99,7 @@ export default { async fetch(request, env) {
       return json({ users: rows.results.map(u => ({ id:u.id,email:u.email,firstName:u.email.split("@")[0],lastName:"",preferredName:null,userType:u.role === "admin" ? "administrator" : "member",status:"active",roles:[u.role],createdAt:u.created_at })) });
     }
     if (path === "/admin/users" && request.method === "POST") {
-      const b = await body(request), email = String(b.email || "").trim().toLowerCase(), password = String(b.password || "User#2026!");
+      const b = await body(request), email = String(b.email || "").trim().toLowerCase(), password = String(b.password || "");
       if (!email || password.length < 8) return json({ error: "Email and password (8+ characters) are required." }, 422);
       const id = crypto.randomUUID();
       try { await env.DB.prepare("insert into users(id,email,password_hash,role) values(?,?,?,?)").bind(id,email,await hashPassword(password),"member").run(); } catch { return json({ error: "That email already exists." }, 409); }

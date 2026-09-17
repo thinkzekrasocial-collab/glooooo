@@ -27,7 +27,8 @@ import { SYSTEM_ROLES } from "@/lib/rbac";
 
 const BOOTSTRAP_VERSION = "3";
 
-export const DEMO_PASSWORD = process.env.ADMIN_BOOTSTRAP_PASSWORD ?? "GlobeBridge#2026!";
+const localDemoPassword = "GlobeBridge#2026!";
+export const DEMO_PASSWORD = process.env.ADMIN_BOOTSTRAP_PASSWORD ?? (process.env.NODE_ENV === "production" ? "" : localDemoPassword);
 
 export const DEMO_ACCOUNTS = [
   {
@@ -173,6 +174,9 @@ async function upsertSettings(adminId: string): Promise<void> {
 }
 
 export async function ensureBootstrap(): Promise<BootstrapResult> {
+  if (process.env.NODE_ENV === "production" && !process.env.ADMIN_BOOTSTRAP_PASSWORD) {
+    throw new Error("ADMIN_BOOTSTRAP_PASSWORD is required in production");
+  }
   await upsertSystemRoles();
 
   const superAdminRole = SYSTEM_ROLES[0];

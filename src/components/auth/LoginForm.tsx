@@ -171,7 +171,7 @@ export function LoginForm({
         </form>
       )}
 
-      <div className="mt-4 panel-soft p-4">
+      {sandboxAccounts.length > 0 ? <div className="mt-4 panel-soft p-4">
         <button
           type="button"
           className="flex w-full items-center justify-between text-left text-xs font-semibold uppercase tracking-wide text-slate-400"
@@ -206,7 +206,7 @@ export function LoginForm({
             ))}
           </div>
         ) : null}
-      </div>
+      </div> : null}
     </div>
   );
 }

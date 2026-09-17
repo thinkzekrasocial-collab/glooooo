@@ -12,7 +12,7 @@ import { db } from "@/db";
 import { platformSettings } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
 import { enforceRateLimit, jsonOk, route } from "@/lib/http";
-import { DEMO_ACCOUNTS, ensureBootstrap } from "@/lib/seed";
+import { ensureBootstrap } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
 
@@ -36,8 +36,6 @@ export const GET = route(async (_req: NextRequest, meta) => {
       ready: true,
       publicSignupEnabled: Boolean(rows[0]?.value ?? false),
       authenticated: Boolean(session),
-      /** Sandbox convenience only: production deployments never publish credentials. */
-      sandboxAccounts: DEMO_ACCOUNTS,
     },
     meta,
   );
