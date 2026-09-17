@@ -20,7 +20,11 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <h2 className="text-3xl font-semibold leading-tight text-white">
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[color:var(--color-mint-400)]/20 bg-[color:var(--color-mint-400)]/10 px-3 py-1 text-xs font-medium text-[color:var(--color-mint-400)]">
+          <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--color-mint-400)] shadow-[0_0_12px_var(--color-mint-400)]" />
+          Secure workspace online
+        </div>
+        <h2 className="text-4xl font-semibold leading-[1.08] tracking-[-0.04em] text-white sm:text-5xl">
           Sign in to your provisioned account
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-slate-400">

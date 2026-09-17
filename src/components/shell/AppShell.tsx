@@ -198,7 +198,7 @@ export function AppShell({
           >
             ☰
           </button>
-          <p className="text-sm font-medium text-slate-300">
+            <p className="text-sm font-semibold tracking-tight text-slate-200">
             {nav.find((item) =>
               item.href === "/app" ? pathname === "/app" : pathname.startsWith(item.href),
             )?.label ?? "Messenger"}
@@ -210,7 +210,7 @@ export function AppShell({
               aria-expanded={notificationsOpen}
               onClick={() => setNotificationsOpen((open) => !open)}
             >
-              🔔 Notifications
+              <span aria-hidden className="text-base">◌</span> Notifications
               {unread > 0 ? (
                 <span className="absolute -right-1 -top-1 rounded-full bg-[color:var(--color-rose-400)] px-1.5 text-[10px] font-bold text-[color:var(--color-ink-950)]">
                   {unread}

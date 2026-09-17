@@ -26,6 +26,16 @@ body {
     #05070f;
   color: #e7ebf7;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(255,255,255,0.025), transparent 34%, rgba(124,156,255,0.02));
+  mix-blend-mode: screen;
 }
 
 ::selection {

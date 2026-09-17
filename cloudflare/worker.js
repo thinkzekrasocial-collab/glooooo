@@ -24,7 +24,7 @@ const tokenFor = () => crypto.randomUUID() + crypto.randomUUID();
 async function userFrom(request, env) {
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) return null;
-  return env.DB.prepare("select u.* from sessions s join users u on u.id=s.user_id where s.token=? and s.expires_at>datetime('now')").bind(token).first();
+  return env.DB.prepare("select u.* from sessions s join users u on u.id=s.user_id where s.token=? and s.expires_at>datetime('now')").bind(await tokenHash(token)).first();
 }
 let seedPromise;
 async function seedAccounts(env) {
@@ -67,7 +67,7 @@ export default { async fetch(request, env) {
   if ((path === "/me" || path === "/users/me") && request.method === "GET") return json({ id:user.id,email:user.email,firstName:user.email.split("@")[0],lastName:"",preferredName:user.email.split("@")[0],userType:"member",status:"active",permissions:[],roles:[] });
   if (path === "/auth/logout" && request.method === "POST") {
     const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-    if (token) await env.DB.prepare("delete from sessions where token=?").bind(token).run();
+    if (token) await env.DB.prepare("delete from sessions where token=?").bind(await tokenHash(token)).run();
     return json({ ok: true });
   }
   if (path === "/directory" && request.method === "GET") {
@@ -153,6 +153,7 @@ export default { async fetch(request, env) {
   if (path === "/messages" && request.method === "POST") { const b=await body(request), ciphertext=String(b.ciphertext||"").trim(); if(!ciphertext||ciphertext.length>1000000)return json({error:"Ciphertext is required."},422); const id=crypto.randomUUID(); await env.DB.prepare("insert into messages(id,user_id,ciphertext) values(?,?,?)").bind(id,user.id,ciphertext).run(); await env.DB.prepare("insert into audit_logs(id,user_id,event_type,target_id) values(?,?,?,?)").bind(crypto.randomUUID(),user.id,"message.created",id).run(); return json({ok:true,id},201); }
   return json({ error: "Not found" }, 404);
 } };
-async function issue(env,id){const token=tokenFor();await env.DB.prepare("insert into sessions(id,user_id,token,expires_at) values(?,?,?,datetime('now','+12 hours'))").bind(crypto.randomUUID(),id,token).run();return json({token});}
+async function issue(env,id){const token=tokenFor();await env.DB.prepare("insert into sessions(id,user_id,token,expires_at) values(?,?,?,datetime('now','+12 hours'))").bind(crypto.randomUUID(),id,await tokenHash(token)).run();return json({token});}
+async function tokenHash(token){const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token));return [...new Uint8Array(bytes)].map(b=>b.toString(16).padStart(2,"0")).join("");}
 async function hashPassword(password){const salt=crypto.randomUUID();const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:100000,hash:'SHA-256'},key,256);return salt+':'+btoa(String.fromCharCode(...new Uint8Array(bits)));}
 async function verifyPassword(password,stored){const [salt,want]=stored.split(':');const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:100000,hash:'SHA-256'},key,256);const got=btoa(String.fromCharCode(...new Uint8Array(bits)));return got===want;}
