@@ -4,14 +4,11 @@ import { Pool } from "pg";
 const databaseUrl = process.env.DATABASE_URL;
 
 // Next analyzes route modules during `next build`, before runtime secrets are
-// available. Keep the hard failure for real requests while using a deliberately
-// unreachable build-only URL so the application can be compiled.
-const isBuildPhase =
-  process.env.NEXT_PHASE === "phase-production-build" ||
-  process.env.VERCEL === "1";
-const connectionString = databaseUrl ?? (isBuildPhase ? "postgresql://build-only.invalid/globebridge" : undefined);
-
-if (!connectionString) throw new Error("DATABASE_URL is required at runtime");
+// available. Never fail at module evaluation: that would make Vercel unable to
+// collect route data. The placeholder is deliberately unreachable; production
+// requests must provide DATABASE_URL and will fail at the database operation
+// boundary instead of breaking deployment-time route analysis.
+const connectionString = databaseUrl ?? "postgresql://build-only.invalid/globebridge";
 
 const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;
