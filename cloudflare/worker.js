@@ -45,7 +45,7 @@ async function seedAccounts(env) {
   return seedPromise;
 }
 async function body(request) { try { return await request.json(); } catch { return {}; } }
-export default { async fetch(request, env) {
+const worker = { async fetch(request, env) {
   const url = new URL(request.url);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   // Demo data is opt-in. A production database must be provisioned by an
@@ -198,6 +198,7 @@ export default { async fetch(request, env) {
   if (path === "/messages" && request.method === "POST") { const b=await body(request), ciphertext=String(b.ciphertext||"").trim(); if(!ciphertext||ciphertext.length>1000000)return json({error:"Ciphertext is required."},422); const id=crypto.randomUUID(); await env.DB.prepare("insert into messages(id,user_id,ciphertext) values(?,?,?)").bind(id,user.id,ciphertext).run(); await env.DB.prepare("insert into audit_logs(id,user_id,event_type,target_id) values(?,?,?,?)").bind(crypto.randomUUID(),user.id,"message.created",id).run(); return json({ok:true,id},201); }
   return json({ error: "Not found" }, 404);
 } };
+export default worker;
 async function issue(env,id){const token=tokenFor();await env.DB.prepare("insert into sessions(id,user_id,token,expires_at) values(?,?,?,datetime('now','+12 hours'))").bind(crypto.randomUUID(),id,await tokenHash(token)).run();return json({token});}
 async function tokenHash(token){const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token));return [...new Uint8Array(bytes)].map(b=>b.toString(16).padStart(2,"0")).join("");}
 async function workerJitsiToken(env, room, user) {

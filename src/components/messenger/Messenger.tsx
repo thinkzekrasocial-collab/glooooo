@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { ConversationSummary, DirectoryEntry, MessageDto } from "@/lib/data";
 import { ApiClientError, apiFetch, formatClock, formatRelativeTime } from "@/lib/api-client";
 import {
@@ -106,6 +107,7 @@ export function Messenger({
   initialConversationId: string | null;
   myGroups: Array<{ id: string; name: string; memberRole?: string }>;
 }) {
+  const router = useRouter();
   const [conversations, setConversations] = useState(initialConversations);
   const [directory] = useState(initialDirectory);
   const [activeId, setActiveId] = useState<string | null>(
@@ -158,7 +160,7 @@ export function Messenger({
     try {
       const groupName = myGroups.find((group) => group.id === groupId)?.name ?? activeConversation?.title ?? "Group";
       const payload = await apiFetch<{ meeting: { id: string } }>("/api/video-meetings", { method: "POST", body: { groupId, type, title: `${groupName} ${type} call` } });
-      window.location.assign(`/app/groups/${groupId}/video-call/${payload.meeting.id}`);
+      router.push(`/app/groups/${groupId}/video-call/${payload.meeting.id}`);
     } catch (caught) { setError(caught instanceof ApiClientError ? caught.message : "Unable to start the conference."); }
   }
 
@@ -713,7 +715,7 @@ export function Messenger({
                 </p>
               </div>
               {activeConversation.groupId ? <div className="flex shrink-0 gap-1">
-                {activeMeeting ? <><button type="button" className="btn-primary text-xs" onClick={() => window.location.assign(`/app/groups/${activeConversation.groupId}/video-call/${activeMeeting.id}`)}>● Live call · Join</button><button type="button" className="btn-ghost text-xs" onClick={() => void restartMeeting()}>Restart</button></> : <>
+                {activeMeeting ? <><button type="button" className="btn-primary text-xs" onClick={() => router.push(`/app/groups/${activeConversation.groupId}/video-call/${activeMeeting.id}`)}>● Live call · Join</button><button type="button" className="btn-ghost text-xs" onClick={() => void restartMeeting()}>Restart</button></> : <>
                   <button type="button" className="btn-ghost text-xs" onClick={() => void startMeeting("voice")}>Voice call</button>
                   <button type="button" className="btn-primary text-xs" onClick={() => void startMeeting("video")}>Video call</button>
                 </>}
