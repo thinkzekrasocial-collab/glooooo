@@ -15,6 +15,8 @@
  * (ciphertext + IV + per-device wrapped keys) is identical.
  */
 
+import { apiBaseUrl } from "@/lib/api-client";
+
 const DB_NAME = "globebridge-e2ee";
 const DB_VERSION = 1;
 const IDENTITY_STORE = "identity";
@@ -146,12 +148,12 @@ async function importPublicJwk(jwk: JsonWebKey): Promise<CryptoKey> {
 export async function ensureDeviceIdentity(): Promise<DeviceIdentity> {
   const identity = await loadOrCreateIdentity();
 
-  const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://demoo.shihab309kye.workers.dev").replace(/\/$/, "");
+  const apiBase = apiBaseUrl();
   const token = typeof window !== "undefined" ? window.localStorage.getItem("gb_token") : null;
   const response = await fetch(`${apiBase}/api/keys`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    credentials: apiBase ? "omit" : "same-origin",
+    credentials: apiBase ? "include" : "same-origin",
     body: JSON.stringify({
       deviceName: identity.deviceName,
       browserInfo: typeof navigator === "undefined" ? null : navigator.userAgent.slice(0, 190),
