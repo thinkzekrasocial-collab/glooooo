@@ -6,11 +6,10 @@ const databaseUrl = process.env.DATABASE_URL;
 // Next analyzes route modules during `next build`, before runtime secrets are
 // available. Keep the hard failure for real requests while using a deliberately
 // unreachable build-only URL so the application can be compiled.
-const connectionString =
-  databaseUrl ??
-  (process.env.NEXT_PHASE === "phase-production-build"
-    ? "postgresql://build-only.invalid/globebridge"
-    : undefined);
+const isBuildPhase =
+  process.env.NEXT_PHASE === "phase-production-build" ||
+  (process.env.VERCEL === "1" && process.env.CI === "1");
+const connectionString = databaseUrl ?? (isBuildPhase ? "postgresql://build-only.invalid/globebridge" : undefined);
 
 if (!connectionString) throw new Error("DATABASE_URL is required at runtime");
 
