@@ -27,6 +27,8 @@ async function userFrom(request, env) {
   return env.DB.prepare("select u.* from sessions s join users u on u.id=s.user_id where s.token=? and s.expires_at>datetime('now')").bind(await tokenHash(token)).first();
 }
 let seedPromise;
+const videoRate = new Map();
+function allowVideoRate(key, limit, windowMs) { const now=Date.now(), hits=(videoRate.get(key)||[]).filter(t=>now-t<windowMs); if(hits.length>=limit){videoRate.set(key,hits);return false;} hits.push(now); videoRate.set(key,hits); return true; }
 async function seedAccounts(env) {
   if (seedPromise) return seedPromise;
   seedPromise = (async () => {
@@ -81,6 +83,46 @@ export default { async fetch(request, env) {
   }
   if (path === "/notifications" && request.method === "GET") return json({ notifications: [], unreadCount: 0 });
   if (path === "/notifications" && request.method === "POST") return json({ notifications: [], unreadCount: 0 });
+  if (path === "/video-meetings" && request.method === "GET") {
+    const groupId = new URL(request.url).searchParams.get("groupId");
+    if (!groupId) return json({ error: "groupId is required." }, 422);
+    const member = await env.DB.prepare("select 1 from group_members where group_id=? and user_id=? and removed_at is null").bind(groupId,user.id).first();
+    if (!member && user.role !== "admin") return json({ error: "You are not a member of this group." }, 403);
+    const meeting = await env.DB.prepare("select id,group_id,room_name,meeting_type as type,status,title,created_by,created_at,started_at,ended_at from video_meetings where group_id=? and status='active' limit 1").bind(groupId).first();
+    return json({ meeting: meeting || null });
+  }
+  if (path === "/video-meetings" && request.method === "POST") {
+    if (!allowVideoRate(`create:${user.id}`,10,60000)) return json({ error: "Too many conference requests. Please slow down." },429);
+    const b = await body(request), groupId = String(b.groupId || ""), type = String(b.type || "");
+    if (!groupId || !["video","voice"].includes(type)) return json({ error: "A valid groupId and call type are required." }, 422);
+    const group = await env.DB.prepare("select * from groups where id=? and status='active'").bind(groupId).first();
+    const member = await env.DB.prepare("select 1 from group_members where group_id=? and user_id=? and removed_at is null").bind(groupId,user.id).first();
+    if (!group || (!member && user.role !== "admin")) return json({ error: "You are not authorized to start this conference." }, 403);
+    if ((type === "video" && !group.video_calls_enabled) || (type === "voice" && !group.voice_calls_enabled)) return json({ error: "This call type is disabled for the group." }, 403);
+    if (group.call_start_permission === "admin_only" && user.role !== "admin") return json({ error: "Only administrators can start conferences for this group." },403);
+    if (group.call_start_permission === "staff_and_admin" && user.role !== "admin") return json({ error: "Staff or administrator access is required to start conferences." },403);
+    const existing = await env.DB.prepare("select * from video_meetings where group_id=? and status='active' limit 1").bind(groupId).first();
+    const meeting = existing || { id: crypto.randomUUID(), group_id: groupId, room_name: `gbp-${crypto.randomUUID()}-${crypto.randomUUID()}`, meeting_type: type, status: "active", title: String(b.title || `${type} call`) };
+    if (!existing) await env.DB.prepare("insert into video_meetings(id,group_id,created_by,room_name,meeting_type,status,title) values(?,?,?,?,?,?,?)").bind(meeting.id,groupId,user.id,meeting.room_name,type,"active",meeting.title).run();
+    await env.DB.prepare("insert or replace into video_meeting_participants(id,meeting_id,user_id,role,status,joined_at,updated_at) values(?,?,?,?,?,?,CURRENT_TIMESTAMP)").bind(crypto.randomUUID(),meeting.id,user.id,user.role === "admin" ? "host" : "participant","joined",new Date().toISOString()).run();
+    const token = await workerJitsiToken(env, meeting.room_name, user);
+    return json({ meeting: { id: meeting.id, groupId, roomName: meeting.room_name, type: meeting.meeting_type || type, status: "active", title: meeting.title }, group: { id: groupId, name: group.name }, conference: { domain: String(env.JITSI_BASE_URL || "").replace(/\/$/,""), jwt: token, meetingType: meeting.meeting_type || type, screenSharingEnabled: !!group.screen_sharing_enabled, displayName: user.email.split("@")[0], email: user.email } }, 201);
+  }
+  const videoMatch = path.match(/^\/video-meetings\/([^/]+)$/);
+  if (videoMatch && request.method === "POST") {
+    if (!allowVideoRate(`join:${user.id}`,30,60000)) return json({ error: "Too many conference requests. Please slow down." },429);
+    const meetingId = videoMatch[1], action = new URL(request.url).searchParams.get("action"), meeting = await env.DB.prepare("select m.*,g.name as group_name,g.screen_sharing_enabled from video_meetings m join groups g on g.id=m.group_id where m.id=?").bind(meetingId).first();
+    if (!meeting || meeting.status !== "active") return json({ error: "This conference is no longer available." }, 409);
+    const member = await env.DB.prepare("select 1 from group_members where group_id=? and user_id=? and removed_at is null").bind(meeting.group_id,user.id).first();
+    if (!member && user.role !== "admin") return json({ error: "You are not authorized to join this conference." }, 403);
+    const policy = await env.DB.prepare("select call_join_permission from groups where id=?").bind(meeting.group_id).first();
+    if (policy?.call_join_permission === "invited_members" && user.role !== "admin") return json({ error: "You are not invited to this conference." },403);
+    if (action === "end") { if (user.id !== meeting.created_by && user.role !== "admin") return json({ error: "Only the host or an administrator can end this conference." },403); await env.DB.prepare("update video_meetings set status='ended',ended_at=CURRENT_TIMESTAMP,ended_reason='explicit' where id=? and status='active'").bind(meetingId).run(); return json({ ok:true }); }
+    if (action === "leave") { await env.DB.prepare("update video_meeting_participants set status='left',left_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP where meeting_id=? and user_id=?").bind(meetingId,user.id).run(); return json({ ok:true }); }
+    if (action !== "join") return json({ error: "action must be join, leave, or end." },422);
+    await env.DB.prepare("insert or replace into video_meeting_participants(id,meeting_id,user_id,role,status,joined_at,updated_at) values(?,?,?,?,?,?,CURRENT_TIMESTAMP)").bind(crypto.randomUUID(),meetingId,user.id,user.id===meeting.created_by?"host":"participant","joined",new Date().toISOString()).run();
+    return json({ meeting: { id:meeting.id, groupId:meeting.group_id, roomName:meeting.room_name, type:meeting.meeting_type, status:meeting.status, title:meeting.title }, group:{id:meeting.group_id,name:meeting.group_name}, conference:{domain:String(env.JITSI_BASE_URL||"").replace(/\/$/,""),jwt:await workerJitsiToken(env,meeting.room_name,user),meetingType:meeting.meeting_type,screenSharingEnabled:!!meeting.screen_sharing_enabled,displayName:user.email.split("@")[0],email:user.email} });
+  }
   if (path === "/reports" && request.method === "POST") {
     const b = await body(request);
     await env.DB.prepare("insert into audit_logs(id,user_id,event_type,target_id) values(?,?,?,?)").bind(crypto.randomUUID(),user.id,"message.reported",String(b.targetId || "")).run();
@@ -155,5 +197,13 @@ export default { async fetch(request, env) {
 } };
 async function issue(env,id){const token=tokenFor();await env.DB.prepare("insert into sessions(id,user_id,token,expires_at) values(?,?,?,datetime('now','+12 hours'))").bind(crypto.randomUUID(),id,await tokenHash(token)).run();return json({token});}
 async function tokenHash(token){const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token));return [...new Uint8Array(bytes)].map(b=>b.toString(16).padStart(2,"0")).join("");}
+async function workerJitsiToken(env, room, user) {
+  if (!env.JITSI_BASE_URL || !env.JITSI_APP_ID || !env.JITSI_APP_SECRET) throw new Error("Jitsi is not configured");
+  const enc = value => btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(value)))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
+  const now = Math.floor(Date.now()/1000), header = enc({alg:"HS256",typ:"JWT"}), payload = enc({aud:env.JITSI_JWT_AUDIENCE||env.JITSI_APP_ID,iss:env.JITSI_JWT_ISSUER||env.JITSI_APP_ID,sub:env.JITSI_JWT_SUBJECT||new URL(env.JITSI_BASE_URL).hostname,room,iat:now,exp:now+600,context:{user:{id:user.id,name:user.email.split("@")[0],email:user.email},features:{recording:false,livestreaming:false}}});
+  const key = await crypto.subtle.importKey("raw",new TextEncoder().encode(env.JITSI_APP_SECRET),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
+  const signature = await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(`${header}.${payload}`));
+  return `${header}.${payload}.${btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")}`;
+}
 async function hashPassword(password){const salt=crypto.randomUUID();const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:100000,hash:'SHA-256'},key,256);return salt+':'+btoa(String.fromCharCode(...new Uint8Array(bits)));}
 async function verifyPassword(password,stored){const [salt,want]=stored.split(':');const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:100000,hash:'SHA-256'},key,256);const got=btoa(String.fromCharCode(...new Uint8Array(bits)));return got===want;}

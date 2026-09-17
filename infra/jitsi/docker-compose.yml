@@ -1,0 +1,35 @@
+# This is a deployment manifest for the official docker-jitsi-meet images.
+# Keep the release package's upstream docker-compose.yml and env.example as
+# the primary source of truth; this file documents the required services and
+# makes accidental recording services impossible to add silently.
+services:
+  web:
+    image: jitsi/web:${JITSI_IMAGE_VERSION}
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ${CONFIG}/web:/config:Z
+      - ${CONFIG}/web/letsencrypt:/etc/letsencrypt:Z
+  prosody:
+    image: jitsi/prosody:${JITSI_IMAGE_VERSION}
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ${CONFIG}/prosody:/config:Z
+  jicofo:
+    image: jitsi/jicofo:${JITSI_IMAGE_VERSION}
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ${CONFIG}/jicofo:/config:Z
+  jvb:
+    image: jitsi/jvb:${JITSI_IMAGE_VERSION}
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "10000:10000/udp"
+    volumes:
+      - ${CONFIG}/jvb:/config:Z

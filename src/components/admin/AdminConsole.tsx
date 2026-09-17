@@ -33,6 +33,12 @@ type AdminGroup = {
   announcementOnly: boolean;
   retentionPolicyDays: number | null;
   fileSharingEnabled: boolean;
+  videoCallsEnabled: boolean;
+  voiceCallsEnabled: boolean;
+  callStartPermission: string;
+  callJoinPermission: string;
+  screenSharingEnabled: boolean;
+  maxCallParticipants: number | null;
   memberCount: number;
   conversationCount: number;
 };
@@ -765,6 +771,29 @@ export function AdminConsole({
                   {group.announcementOnly ? <span className="chip-warn">announcement-only</span> : null}
                   {group.retentionPolicyDays ? <span className="chip">{group.retentionPolicyDays}d retention</span> : null}
                   {group.maxMembers ? <span className="chip">max {group.maxMembers}</span> : null}
+                  {group.videoCallsEnabled ? <span className="chip-ok">video calls</span> : null}
+                  {group.voiceCallsEnabled ? <span className="chip-ok">voice calls</span> : null}
+                </div>
+                <div className="mt-3 rounded-lg border border-white/10 bg-black/10 p-3">
+                  <p className="text-xs font-semibold text-slate-300">Communication · Video conference</p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {([["videoCallsEnabled", "Enable video calls", group.videoCallsEnabled], ["voiceCallsEnabled", "Enable voice calls", group.voiceCallsEnabled], ["screenSharingEnabled", "Allow screen sharing", group.screenSharingEnabled]] as const).map(([field, label, checked]) => (
+                      <label key={field} className="flex items-center gap-2 text-xs text-slate-400">
+                        <input type="checkbox" defaultChecked={checked} onChange={(event) => void run(async () => { await apiFetch(`/api/admin/groups/${group.id}`, { method: "PATCH", body: { [field]: event.target.checked } }); await refreshGroups(); })} />
+                        {label}
+                      </label>
+                    ))}
+                    <label className="text-xs text-slate-400">Who can start
+                      <select className="field mt-1" defaultValue={group.callStartPermission} onChange={(event) => void run(async () => { await apiFetch(`/api/admin/groups/${group.id}`, { method: "PATCH", body: { callStartPermission: event.target.value } }); await refreshGroups(); })}>
+                        <option value="admin_only">Admins only</option><option value="staff_and_admin">Staff and admins</option><option value="group_members">Group members</option>
+                      </select>
+                    </label>
+                    <label className="text-xs text-slate-400">Who can join
+                      <select className="field mt-1" defaultValue={group.callJoinPermission} onChange={(event) => void run(async () => { await apiFetch(`/api/admin/groups/${group.id}`, { method: "PATCH", body: { callJoinPermission: event.target.value } }); await refreshGroups(); })}>
+                        <option value="group_members">Group members</option><option value="invited_members">Invited members</option><option value="admins_and_members">Admins and members</option>
+                      </select>
+                    </label>
+                  </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button

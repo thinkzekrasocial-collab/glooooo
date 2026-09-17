@@ -92,6 +92,19 @@ export const PATCH = route(async (req: NextRequest, meta, ctx: Ctx) => {
     updates.voiceVideoEnabled = voiceVideoEnabled;
     fields.push("voiceVideoEnabled");
   }
+  for (const [key, allowed] of [
+    ["videoCallsEnabled", "boolean"], ["voiceCallsEnabled", "boolean"], ["screenSharingEnabled", "boolean"],
+  ] as const) {
+    const value = boolValue(body, key);
+    if (value !== undefined) { updates[key] = value; fields.push(key); }
+    void allowed;
+  }
+  const callStartPermission = enumValue(body, "callStartPermission", ["admin_only", "staff_and_admin", "group_members"] as const);
+  if (callStartPermission !== undefined) { updates.callStartPermission = callStartPermission; fields.push("callStartPermission"); }
+  const callJoinPermission = enumValue(body, "callJoinPermission", ["group_members", "invited_members", "admins_and_members"] as const);
+  if (callJoinPermission !== undefined) { updates.callJoinPermission = callJoinPermission; fields.push("callJoinPermission"); }
+  const maxCallParticipants = intValue(body, "maxCallParticipants", { min: 2, max: 5000 });
+  if (maxCallParticipants !== undefined) { updates.maxCallParticipants = maxCallParticipants; fields.push("maxCallParticipants"); }
   const announcementOnly = boolValue(body, "announcementOnly");
   if (announcementOnly !== undefined) {
     updates.announcementOnly = announcementOnly;

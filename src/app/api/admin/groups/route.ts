@@ -44,6 +44,12 @@ export const POST = route(async (req: NextRequest, meta) => {
   const retentionPolicyDays = intValue(body, "retentionPolicyDays", { min: 1, max: 3650 });
   const fileSharingEnabled = boolValue(body, "fileSharingEnabled") ?? true;
   const voiceVideoEnabled = boolValue(body, "voiceVideoEnabled") ?? false;
+  const videoCallsEnabled = boolValue(body, "videoCallsEnabled") ?? voiceVideoEnabled;
+  const voiceCallsEnabled = boolValue(body, "voiceCallsEnabled") ?? voiceVideoEnabled;
+  const screenSharingEnabled = boolValue(body, "screenSharingEnabled") ?? false;
+  const callStartPermission = enumValue(body, "callStartPermission", ["admin_only", "staff_and_admin", "group_members"] as const) ?? "admin_only";
+  const callJoinPermission = enumValue(body, "callJoinPermission", ["group_members", "invited_members", "admins_and_members"] as const) ?? "group_members";
+  const maxCallParticipants = intValue(body, "maxCallParticipants", { min: 2, max: 5000 });
   const announcementOnly = boolValue(body, "announcementOnly") ?? false;
   const memberIds = stringArray(body, "memberIds") ?? [];
 
@@ -59,6 +65,12 @@ export const POST = route(async (req: NextRequest, meta) => {
     retentionPolicyDays: retentionPolicyDays ?? null,
     fileSharingEnabled,
     voiceVideoEnabled,
+    videoCallsEnabled,
+    voiceCallsEnabled,
+    screenSharingEnabled,
+    callStartPermission,
+    callJoinPermission,
+    maxCallParticipants: maxCallParticipants ?? null,
     announcementOnly,
     createdByAdminId: admin.id,
   });

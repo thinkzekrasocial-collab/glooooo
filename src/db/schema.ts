@@ -112,6 +112,12 @@ export const groups = pgTable(
     messagingPerms: jsonb("messaging_perms").notNull().default({}),
     fileSharingEnabled: boolean("file_sharing_enabled").notNull().default(true),
     voiceVideoEnabled: boolean("voice_video_enabled").notNull().default(false),
+    videoCallsEnabled: boolean("video_calls_enabled").notNull().default(false),
+    voiceCallsEnabled: boolean("voice_calls_enabled").notNull().default(false),
+    callStartPermission: text("call_start_permission").notNull().default("admin_only"),
+    callJoinPermission: text("call_join_permission").notNull().default("group_members"),
+    screenSharingEnabled: boolean("screen_sharing_enabled").notNull().default(false),
+    maxCallParticipants: integer("max_call_participants"),
     retentionPolicyDays: integer("retention_policy_days"),
     announcementOnly: boolean("announcement_only").notNull().default(false),
     createdByAdminId: text("created_by_admin_id").notNull(),
@@ -542,4 +548,56 @@ export const typingIndicators = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.conversationId, t.userId] })],
+);
+
+/* ═════════════════════ VIDEO CONFERENCING ═════════════════════
+ * Application metadata only. Audio, video, SDP, recordings and media packets
+ * never enter this database; Jitsi is the media infrastructure boundary.
+ */
+export const videoMeetings = pgTable(
+  "video_meetings",
+  {
+    id: text("id").primaryKey(),
+    groupId: text("group_id").notNull().references(() => groups.id, { onDelete: "cascade" }),
+    createdBy: text("created_by").notNull().references(() => users.id),
+    roomName: text("room_name").notNull().unique(),
+    meetingType: text("meeting_type").notNull().default("video"),
+    status: text("status").notNull().default("active"),
+    title: text("title").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    scheduledStartAt: timestamp("scheduled_start_at", { withTimezone: true }),
+    scheduledEndAt: timestamp("scheduled_end_at", { withTimezone: true }),
+    endedReason: text("ended_reason"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_video_meetings_group").on(t.groupId),
+    index("idx_video_meetings_creator").on(t.createdBy),
+    index("idx_video_meetings_status").on(t.status),
+    index("idx_video_meetings_room").on(t.roomName),
+    index("idx_video_meetings_created").on(t.createdAt),
+  ],
+);
+
+export const videoMeetingParticipants = pgTable(
+  "video_meeting_participants",
+  {
+    id: text("id").primaryKey(),
+    meetingId: text("meeting_id").notNull().references(() => videoMeetings.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("participant"),
+    joinedAt: timestamp("joined_at", { withTimezone: true }),
+    leftAt: timestamp("left_at", { withTimezone: true }),
+    status: text("status").notNull().default("invited"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_video_participants_meeting").on(t.meetingId),
+    index("idx_video_participants_user").on(t.userId),
+    index("idx_video_participants_status").on(t.meetingId, t.status),
+    uniqueIndex("uq_video_participant").on(t.meetingId, t.userId),
+  ],
 );

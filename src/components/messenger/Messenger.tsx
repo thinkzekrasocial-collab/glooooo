@@ -126,6 +126,7 @@ export function Messenger({
   }>({ status: "idle", pending: 0 });
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
   const [mobilePane, setMobilePane] = useState<"list" | "thread">(initialConversationId ? "thread" : "list");
+  const [activeMeeting, setActiveMeeting] = useState<{ id: string; status: string; type: string } | null>(null);
 
   const plaintextRef = useRef<Map<string, string>>(new Map());
   const keyMaterialRef = useRef<Map<string, string>>(new Map());
@@ -136,6 +137,25 @@ export function Messenger({
     () => conversations.find((conversation) => conversation.id === activeId) ?? null,
     [conversations, activeId],
   );
+
+  useEffect(() => {
+    if (!activeConversation?.groupId) { setActiveMeeting(null); return; }
+    let cancelled = false;
+    const refresh = () => void apiFetch<{ meeting: { id: string; status: string; type: string } | null }>(`/api/video-meetings?groupId=${encodeURIComponent(activeConversation.groupId!)}`)
+      .then((payload) => { if (!cancelled) setActiveMeeting(payload.meeting); })
+      .catch(() => { if (!cancelled) setActiveMeeting(null); });
+    refresh();
+    const timer = window.setInterval(refresh, 15_000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [activeConversation?.groupId]);
+
+  async function startMeeting(type: "video" | "voice") {
+    if (!activeConversation?.groupId) return;
+    try {
+      const payload = await apiFetch<{ meeting: { id: string } }>("/api/video-meetings", { method: "POST", body: { groupId: activeConversation.groupId, type, title: `${activeConversation.title} ${type} call` } });
+      window.location.assign(`/app/groups/${activeConversation.groupId}/video-call/${payload.meeting.id}`);
+    } catch (caught) { setError(caught instanceof ApiClientError ? caught.message : "Unable to start the conference."); }
+  }
 
   const filteredConversations = useMemo(() => {
     const needle = searchTerm.trim().toLowerCase();
@@ -669,6 +689,12 @@ export function Messenger({
                     : "Loading channel…"}
                 </p>
               </div>
+              {activeConversation.groupId ? <div className="flex shrink-0 gap-1">
+                {activeMeeting ? <button type="button" className="btn-primary text-xs" onClick={() => window.location.assign(`/app/groups/${activeConversation.groupId}/video-call/${activeMeeting.id}`)}>● Live call · Join</button> : <>
+                  <button type="button" className="btn-ghost text-xs" onClick={() => void startMeeting("voice")}>Voice call</button>
+                  <button type="button" className="btn-primary text-xs" onClick={() => void startMeeting("video")}>Video call</button>
+                </>}
+              </div> : null}
               <span
                 className={
                   keyState.status === "ready"
