@@ -66,7 +66,10 @@ export default { async fetch(request, env) {
     return json({ ...payload, mfaRequired: false, next: "/app", user: { id: user.id, email: user.email } }, 200, { "set-cookie": `gb_session=${payload.token}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=43200` });
   }
   const user = await userFrom(request, env); if (!user) return json({ error: "Authentication required." }, 401);
-  if ((path === "/me" || path === "/users/me") && request.method === "GET") return json({ id:user.id,email:user.email,firstName:user.email.split("@")[0],lastName:"",preferredName:user.email.split("@")[0],userType:"member",status:"active",permissions:[],roles:[] });
+  if ((path === "/me" || path === "/users/me") && request.method === "GET") {
+    const groups = await env.DB.prepare("select g.id,g.name,gm.member_role as memberRole from group_members gm join groups g on g.id=gm.group_id where gm.user_id=? and gm.removed_at is null and g.status='active' order by g.name").bind(user.id).all().catch(() => ({ results: [] }));
+    return json({ id:user.id,email:user.email,firstName:user.email.split("@")[0],lastName:"",preferredName:user.email.split("@")[0],userType:user.role === "admin" ? "admin" : "member",status:"active",permissions:user.role === "admin" ? ["*"] : [],roles:[user.role],groups:groups.results });
+  }
   if (path === "/auth/logout" && request.method === "POST") {
     const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
     if (token) await env.DB.prepare("delete from sessions where token=?").bind(await tokenHash(token)).run();

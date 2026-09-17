@@ -98,11 +98,13 @@ export function Messenger({
   initialConversations,
   initialDirectory,
   initialConversationId,
+  myGroups,
 }: {
   me: { id: string; name: string; permissions: string[] };
   initialConversations: ConversationSummary[];
   initialDirectory: DirectoryEntry[];
   initialConversationId: string | null;
+  myGroups: Array<{ id: string; name: string; memberRole?: string }>;
 }) {
   const [conversations, setConversations] = useState(initialConversations);
   const [directory] = useState(initialDirectory);
@@ -127,6 +129,7 @@ export function Messenger({
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
   const [mobilePane, setMobilePane] = useState<"list" | "thread">(initialConversationId ? "thread" : "list");
   const [activeMeeting, setActiveMeeting] = useState<{ id: string; status: string; type: string } | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState(myGroups[0]?.id ?? "");
 
   const plaintextRef = useRef<Map<string, string>>(new Map());
   const keyMaterialRef = useRef<Map<string, string>>(new Map());
@@ -149,11 +152,13 @@ export function Messenger({
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [activeConversation?.groupId]);
 
-  async function startMeeting(type: "video" | "voice") {
-    if (!activeConversation?.groupId) return;
+  async function startMeeting(type: "video" | "voice", requestedGroupId?: string) {
+    const groupId = requestedGroupId ?? activeConversation?.groupId ?? selectedGroupId;
+    if (!groupId) { setError("Join a group before starting a conference."); return; }
     try {
-      const payload = await apiFetch<{ meeting: { id: string } }>("/api/video-meetings", { method: "POST", body: { groupId: activeConversation.groupId, type, title: `${activeConversation.title} ${type} call` } });
-      window.location.assign(`/app/groups/${activeConversation.groupId}/video-call/${payload.meeting.id}`);
+      const groupName = myGroups.find((group) => group.id === groupId)?.name ?? activeConversation?.title ?? "Group";
+      const payload = await apiFetch<{ meeting: { id: string } }>("/api/video-meetings", { method: "POST", body: { groupId, type, title: `${groupName} ${type} call` } });
+      window.location.assign(`/app/groups/${groupId}/video-call/${payload.meeting.id}`);
     } catch (caught) { setError(caught instanceof ApiClientError ? caught.message : "Unable to start the conference."); }
   }
 
@@ -593,6 +598,16 @@ export function Messenger({
             Message bodies are end-to-end encrypted — search covers channel names, member names and
             the directory only.
           </p>
+          {myGroups.length > 0 ? <div className="rounded-lg border border-indigo-400/20 bg-indigo-500/10 p-3">
+            <p className="text-xs font-semibold text-indigo-100">Start a group conference</p>
+            <div className="mt-2 flex gap-2">
+              <select className="field min-w-0 flex-1 text-xs" value={selectedGroupId} onChange={(event) => setSelectedGroupId(event.target.value)} aria-label="Choose group for conference">
+                {myGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+              </select>
+              <button type="button" className="btn-ghost shrink-0 text-xs" onClick={() => void startMeeting("voice", selectedGroupId)}>Voice Call</button>
+              <button type="button" className="btn-primary shrink-0 text-xs" onClick={() => void startMeeting("video", selectedGroupId)}>Video Call</button>
+            </div>
+          </div> : null}
         </div>
 
         <ul className="min-h-0 flex-1 overflow-y-auto">
