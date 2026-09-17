@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   async headers() {
-    const jitsi = (process.env.JITSI_BASE_URL ?? "https://meet.example.com").replace(/\/$/, "");
+    const jitsi = (process.env.JITSI_BASE_URL?.trim() || "https://meet.example.com").replace(/\/$/, "");
     const api = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
     return [{
       source: "/(.*)",
