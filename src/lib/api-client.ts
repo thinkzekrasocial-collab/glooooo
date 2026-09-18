@@ -48,13 +48,13 @@ function getBearerToken(): string | null {
 }
 
 export async function apiFetch<T>(path: string, options: Options = {}): Promise<T> {
-  // The Next deployment owns the auth cookie and API routes. Keep requests
-  // same-origin unless a separately deployed API is explicitly configured;
-  // the old hard-coded Worker fallback caused successful logins to lose their
-  // cookie on the subsequent `/api/users/me` request and created a login loop.
+  // Use the configured Worker directly. Its CORS allow-list includes the
+  // production frontend origin, and the bearer token is persisted per tab so
+  // the session survives the redirect to `/app`. Without an external Worker,
+  // keep the app's same-origin API behavior.
   const apiBase = apiBaseUrl();
   const bearerToken = getBearerToken();
-  const requestPath = apiBase ? `/api/worker${path}` : path;
+  const requestPath = apiBase ? `${apiBase}${path}` : path;
   const response = await fetch(requestPath, {
     method: options.method ?? "GET",
     headers: {
@@ -63,10 +63,7 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
     signal: options.signal,
-    // The Cloudflare Worker API is a bearer-token API when configured as an
-    // external origin. Omitting credentials avoids wildcard-CORS rejection;
-    // same-origin Next.js requests still use the httpOnly session cookie.
-    credentials: "same-origin",
+    credentials: apiBase ? "include" : "same-origin",
     cache: "no-store",
   });
 
