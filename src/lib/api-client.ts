@@ -19,6 +19,15 @@ type Options = {
   signal?: AbortSignal;
 };
 
+// Compatibility for an already deployed Worker that still returns a bearer
+// token while the cookie-based deployment rolls out. Keep this only in memory:
+// it must never be persisted in localStorage or exposed to unrelated tabs.
+let legacyBearerToken: string | null = null;
+
+export function setLegacyBearerToken(token: string | null): void {
+  legacyBearerToken = token;
+}
+
 export async function apiFetch<T>(path: string, options: Options = {}): Promise<T> {
   // The Next deployment owns the auth cookie and API routes. Keep requests
   // same-origin unless a separately deployed API is explicitly configured;
@@ -29,6 +38,7 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
     method: options.method ?? "GET",
     headers: {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(legacyBearerToken ? { Authorization: `Bearer ${legacyBearerToken}` } : {}),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
     signal: options.signal,

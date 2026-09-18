@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ApiClientError, apiFetch } from "@/lib/api-client";
+import { ApiClientError, apiFetch, setLegacyBearerToken } from "@/lib/api-client";
 
 type SandboxAccount = { email: string; name: string; role: string; label: string; password?: string };
 
@@ -44,10 +44,13 @@ export function LoginForm({
         setError("Enter your email and password.");
         return;
       }
-      const result = await apiFetch<{ mfaRequired: boolean; next: string }>("/api/auth/login", {
+      const result = await apiFetch<{ mfaRequired: boolean; next: string; token?: string }>("/api/auth/login", {
         method: "POST",
         body: { email: submittedEmail, password: submittedPassword },
       });
+      // Older deployed Workers return a bearer token and reject their cookie;
+      // newer deployments use the httpOnly cookie and omit this field.
+      setLegacyBearerToken(result.token ?? null);
       if (result.mfaRequired) {
         setMfaRequired(true);
         return;

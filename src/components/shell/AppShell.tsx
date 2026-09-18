@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ApiClientError, apiFetch, formatRelativeTime } from "@/lib/api-client";
+import { ApiClientError, apiFetch, formatRelativeTime, setLegacyBearerToken } from "@/lib/api-client";
 import { E2eeUnavailableError, ensureDeviceIdentity } from "@/lib/e2ee";
 
 type Me = {
@@ -115,6 +115,7 @@ export function AppShell({
     try {
       await apiFetch("/api/auth/logout", { method: "POST", body: {} });
     } finally {
+      setLegacyBearerToken(null);
       router.replace("/login");
       router.refresh();
     }
