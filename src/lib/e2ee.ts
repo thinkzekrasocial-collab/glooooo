@@ -15,7 +15,7 @@
  * (ciphertext + IV + per-device wrapped keys) is identical.
  */
 
-import { apiBaseUrl } from "@/lib/api-client";
+import { apiFetch } from "@/lib/api-client";
 
 const DB_NAME = "globebridge-e2ee";
 const DB_VERSION = 1;
@@ -148,26 +148,24 @@ async function importPublicJwk(jwk: JsonWebKey): Promise<CryptoKey> {
 export async function ensureDeviceIdentity(): Promise<DeviceIdentity> {
   const identity = await loadOrCreateIdentity();
 
-  const apiBase = apiBaseUrl();
-  const response = await fetch(`${apiBase}/api/keys`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({
+  try {
+    const payload = await apiFetch<{ deviceId?: string }>("/api/keys", {
+      method: "POST",
+      body: {
       deviceName: identity.deviceName,
       browserInfo: typeof navigator === "undefined" ? null : navigator.userAgent.slice(0, 190),
       publicIdentityKey: JSON.stringify(identity.publicJwk),
       deviceId: identity.deviceId,
-    }),
-  });
-  const payload = (await response.json()) as { deviceId?: string };
-  const deviceId = payload.deviceId;
-  if (!response.ok || !deviceId) {
+      },
+    });
+    const deviceId = payload.deviceId;
+    if (!deviceId) throw new E2eeUnavailableError("This browser could not be registered for encrypted messaging.");
+    await idbPut(IDENTITY_STORE, IDENTITY_KEY, { ...identity, deviceId });
+    return { deviceId, publicJwk: identity.publicJwk, deviceName: identity.deviceName };
+  } catch {
     if (identity.deviceId) return { deviceId: identity.deviceId, publicJwk: identity.publicJwk, deviceName: identity.deviceName };
     throw new E2eeUnavailableError("This browser could not be registered for encrypted messaging.");
   }
-  await idbPut(IDENTITY_STORE, IDENTITY_KEY, { ...identity, deviceId });
-  return { deviceId, publicJwk: identity.publicJwk, deviceName: identity.deviceName };
 }
 
 export async function currentDeviceId(): Promise<string | null> {

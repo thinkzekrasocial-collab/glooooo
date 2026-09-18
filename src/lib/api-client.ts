@@ -42,7 +42,10 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
     signal: options.signal,
-    credentials: "include",
+    // The Cloudflare Worker API is a bearer-token API when configured as an
+    // external origin. Omitting credentials avoids wildcard-CORS rejection;
+    // same-origin Next.js requests still use the httpOnly session cookie.
+    credentials: apiBase ? "omit" : "same-origin",
     cache: "no-store",
   });
 
