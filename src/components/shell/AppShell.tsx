@@ -69,13 +69,28 @@ export function AppShell({
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const refreshUnread = () => {
+      void apiFetch<{ unreadCount: number }>("/api/notifications")
+        .then((payload) => { if (!cancelled) setUnread(payload.unreadCount); })
+        .catch(() => undefined);
+    };
+    refreshUnread();
+    const timer = window.setInterval(refreshUnread, 30_000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, []);
+
+  useEffect(() => {
     if (!notificationsOpen) return;
-    apiFetch<{ notifications: NotificationItem[]; unreadCount: number }>("/api/notifications")
+    let cancelled = false;
+    void apiFetch<{ notifications: NotificationItem[]; unreadCount: number }>("/api/notifications")
       .then((payload) => {
+        if (cancelled) return;
         setNotifications(payload.notifications);
         setUnread(payload.unreadCount);
       })
       .catch(() => undefined);
+    return () => { cancelled = true; };
   }, [notificationsOpen]);
 
   useEffect(() => {
@@ -114,7 +129,7 @@ export function AppShell({
   return (
     <div className="flex min-h-screen">
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-72 shrink-0 border-r border-white/10 bg-[color:var(--color-ink-900)]/95 px-4 py-5 backdrop-blur-xl transition-transform lg:static lg:translate-x-0 ${
+        className={`app-sidebar fixed inset-y-0 left-0 z-40 flex w-72 shrink-0 flex-col border-r border-white/10 px-4 py-5 transition-transform lg:static lg:translate-x-0 ${
           drawerOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -159,7 +174,7 @@ export function AppShell({
           )}
         </div>
 
-        <div className="absolute inset-x-4 bottom-5">
+        <div className="mt-auto pt-6">
           <div className="panel-soft p-3">
             <p className="truncate text-sm font-medium text-slate-100">{me.name}</p>
             <p className="truncate text-xs text-slate-500">{me.email}</p>
@@ -189,7 +204,7 @@ export function AppShell({
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/10 bg-[color:var(--color-ink-950)]/80 px-4 py-3 backdrop-blur-xl">
+        <header className="app-header sticky top-0 z-20 flex items-center gap-3 border-b border-white/10 px-4 py-3">
           <button
             type="button"
             className="btn-quiet lg:hidden"

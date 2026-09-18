@@ -1,6 +1,5 @@
 /** GET/POST /api/admin/groups — group provisioning (TRD §10). */
 import { NextRequest } from "next/server";
-import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { groupMembers, groups, users } from "@/db/schema";
 import { notifyUser, recordAudit } from "@/lib/audit";

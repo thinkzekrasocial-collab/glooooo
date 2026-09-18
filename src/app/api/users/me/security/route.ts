@@ -4,7 +4,7 @@ import { and, eq, isNull, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { devices, sessions } from "@/db/schema";
 import { recordAudit, recordSecurityEvent } from "@/lib/audit";
-import { requireUser, revokeAllSessions, revokeDeviceSessions } from "@/lib/auth";
+import { requireUser, revokeDeviceSessions } from "@/lib/auth";
 import { listUserDevices, listUserSessions } from "@/lib/data";
 import { ApiError, enumValue, jsonOk, readJson, route, str } from "@/lib/http";
 

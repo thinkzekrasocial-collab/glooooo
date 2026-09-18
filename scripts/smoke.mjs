@@ -52,7 +52,9 @@ const PASSWORD = "GlobeBridge#2026!";
 
 async function main() {
   console.log("→ bootstrap");
-  const setup = await api("/api/setup", { method: "POST" });
+  // Bootstrap is admin-protected; the login path still initializes a fresh database.
+  const bootstrapLogin = await login("admin@globebridge.edu", PASSWORD);
+  const setup = await api("/api/setup", { method: "POST", cookie: bootstrapLogin.cookie });
   check("POST /api/setup", setup.status === 200 && setup.json.ok === true, JSON.stringify(setup.json));
 
   const health = await api("/api/health");

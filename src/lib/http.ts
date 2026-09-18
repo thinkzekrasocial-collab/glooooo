@@ -36,6 +36,23 @@ export function getRequestMeta(req: NextRequest, requestId?: string): RequestMet
   };
 }
 
+function assertSameOrigin(req: NextRequest): void {
+  if (process.env.NODE_ENV === "production") {
+    const forwardedProto = req.headers.get("x-forwarded-proto")?.split(",")[0].trim();
+    if ((forwardedProto ?? new URL(req.url).protocol.replace(":", "")) !== "https") {
+      throw new ApiError("HTTPS_REQUIRED", "HTTPS is required.", 400);
+    }
+  }
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return;
+  const origin = req.headers.get("origin");
+  if (origin) {
+    const allowed = [new URL(req.url).origin, process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "")].filter(Boolean);
+    if (!allowed.includes(origin.replace(/\/$/, ""))) throw new ApiError("CSRF_ORIGIN_REJECTED", "Cross-site request rejected.", 403);
+  } else if (req.headers.get("sec-fetch-site") === "cross-site") {
+    throw new ApiError("CSRF_ORIGIN_REJECTED", "Cross-site request rejected.", 403);
+  }
+}
+
 export function errorResponse(error: unknown, requestId: string): Response {
   if (error instanceof ApiError) {
     return Response.json(
@@ -73,6 +90,7 @@ export function route<T extends unknown[]>(
   return async (req: NextRequest, ...rest: T): Promise<Response> => {
     const meta = getRequestMeta(req);
     try {
+      assertSameOrigin(req);
       return await handler(req, meta, ...rest);
     } catch (error) {
       return errorResponse(error, meta.requestId);

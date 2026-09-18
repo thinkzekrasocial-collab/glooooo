@@ -20,22 +20,10 @@ body {
 }
 
 body {
-  background:
-    radial-gradient(1200px 600px at 15% -10%, rgba(91, 124, 250, 0.18), transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, rgba(69, 224, 176, 0.12), transparent 55%),
-    #05070f;
+  background: #080b12;
   color: #e7ebf7;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  letter-spacing: -0.01em;
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(120deg, rgba(255,255,255,0.025), transparent 34%, rgba(124,156,255,0.02));
-  mix-blend-mode: screen;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: -0.008em;
 }
 
 ::selection {
@@ -59,17 +47,16 @@ body::before {
 
 /* ── surfaces ── */
 .panel {
-  border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 20px 60px -36px rgba(0, 0, 0, 0.9);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #10151f;
+  box-shadow: 0 16px 40px -32px rgba(0, 0, 0, 0.8);
 }
 
 .panel-soft {
-  border-radius: 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0.625rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: #0d121a;
 }
 
 button,
@@ -291,7 +278,7 @@ select {
 
 /* ── misc ── */
 .message-bubble {
-  box-shadow: 0 10px 30px -18px rgba(5, 7, 15, 0.9);
+  box-shadow: 0 8px 20px -16px rgba(0, 0, 0, 0.9);
 }
 
 .fade-in {
@@ -306,5 +293,125 @@ select {
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* ── messenger workspace ── */
+.messenger-layout {
+  height: calc(100dvh - 57px);
+  min-height: 34rem;
+  background: #0b0f16;
+}
+
+.conversation-panel {
+  width: 20rem;
+  flex: 0 0 20rem;
+  background: #0e131c;
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.app-sidebar {
+  background: #0e131c;
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.app-header {
+  min-height: 3.5625rem;
+  background: #0e131c;
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.conversation-toolbar {
+  padding: 1rem;
+  background: #101620;
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.conversation-list {
+  padding: 0.5rem;
+}
+
+.conversation-list > li > button {
+  margin: 0.125rem 0;
+  border: 1px solid transparent;
+  border-radius: 0.625rem;
+  padding: 0.75rem;
+}
+
+.conversation-list > li > button:hover {
+  background: #151c28;
+}
+
+.conversation-list > li > button.bg-white\/\[0\.06\] {
+  background: #182235;
+  border-color: rgba(124, 156, 255, 0.2);
+}
+
+.chat-panel {
+  min-width: 0;
+  background: #0b0f16;
+}
+
+.chat-header {
+  min-height: 4.25rem;
+  padding: 0.875rem 1.25rem;
+  background: #101620;
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.message-scroll {
+  padding: 1.5rem clamp(1rem, 4vw, 3rem);
+  background: #0b0f16;
+}
+
+.message-scroll > div.flex {
+  margin-block: 0.625rem;
+}
+
+.message-scroll .message-bubble {
+  border-radius: 0.75rem;
+  padding: 0.7rem 0.9rem;
+}
+
+.composer {
+  flex: 0 0 auto;
+  padding: 0.875rem 1.25rem 1rem;
+  background: #101620;
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.composer .field {
+  min-height: 2.75rem;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #0b0f16;
+}
+
+.composer .btn-primary,
+.composer .btn-ghost {
+  min-height: 2.75rem;
+}
+
+@media (max-width: 1023px) {
+  .conversation-panel {
+    width: 100%;
+    flex-basis: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .messenger-layout {
+    min-height: calc(100dvh - 57px);
+  }
+
+  .chat-header {
+    padding-inline: 0.875rem;
+  }
+
+  .message-scroll {
+    padding: 1rem 0.875rem;
+  }
+
+  .composer {
+    padding: 0.75rem;
   }
 }

@@ -1,20 +1,84 @@
-"use client";
+import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { users } from "@/db/schema";
+import { getSessionUser } from "@/lib/auth";
+import {
+  listReportsForUser,
+  listUserDevices,
+  listUserSessions,
+  myGroups,
+  userPreferencesFor,
+} from "@/lib/data";
+import { SettingsConsole } from "@/components/settings/SettingsConsole";
 
-import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api-client";
+export const dynamic = "force-dynamic";
 
-type User = { email: string; firstName?: string; preferredName?: string; userType?: string; status?: string };
+export default async function SettingsPage() {
+  const session = await getSessionUser();
+  if (!session) redirect("/login");
 
-export default function SettingsPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [message, setMessage] = useState("Loading account from Cloudflare…");
-  useEffect(() => {
-    apiFetch<User>("/api/users/me").then(value => { setUser(value); setMessage("Account is connected to Cloudflare D1."); }).catch(error => setMessage(error instanceof Error ? error.message : "Account could not be loaded."));
-  }, []);
-  return <main className="mx-auto w-full max-w-3xl space-y-6 p-6 lg:p-10">
-    <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">Cloudflare account</p><h1 className="mt-2 text-3xl font-semibold text-white">Settings</h1><p className="mt-2 text-sm text-slate-400">Your account session and messenger data are connected to the Worker API.</p></div>
-    <p className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">{message}</p>
-    <section className="panel p-6"><h2 className="text-lg font-semibold text-white">Profile</h2><dl className="mt-5 grid gap-4 sm:grid-cols-2"><div><dt className="text-xs uppercase tracking-wide text-slate-500">Email</dt><dd className="mt-1 text-slate-200">{user?.email ?? "—"}</dd></div><div><dt className="text-xs uppercase tracking-wide text-slate-500">Name</dt><dd className="mt-1 text-slate-200">{user?.preferredName || user?.firstName || "—"}</dd></div><div><dt className="text-xs uppercase tracking-wide text-slate-500">Account type</dt><dd className="mt-1 text-slate-200">{user?.userType ?? "—"}</dd></div><div><dt className="text-xs uppercase tracking-wide text-slate-500">Status</dt><dd className="mt-1 text-emerald-300">{user?.status ?? "—"}</dd></div></dl></section>
-    <section className="panel p-6"><h2 className="text-lg font-semibold text-white">Security</h2><p className="mt-2 text-sm text-slate-400">Your session uses a bearer token and browser-held encryption keys. Message plaintext is not sent to Cloudflare.</p><p className="mt-4 text-xs text-slate-500">Use Sign out in the left navigation to revoke this session.</p></section>
-  </main>;
+  const rows = await db.select().from(users).where(eq(users.id, session.id)).limit(1);
+  const user = rows[0];
+  if (!user) redirect("/login");
+
+  const [preferences, sessions, devices, groups, reports] = await Promise.all([
+    userPreferencesFor(user.id),
+    listUserSessions(user.id),
+    listUserDevices(user.id),
+    myGroups(user.id),
+    listReportsForUser(user.id),
+  ]);
+
+  return (
+    <SettingsConsole
+      me={{
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        preferredName: user.preferredName,
+        phoneNumber: user.phoneNumber,
+        campusLocation: user.campusLocation,
+        dateOfBirth: user.dateOfBirth,
+        userType: user.userType,
+        status: user.status,
+        studentId: user.studentId,
+        employeeId: user.employeeId,
+        department: user.department,
+        gradeClass: user.gradeClass,
+        program: user.program,
+        mfaEnabled: user.mfaEnabled,
+        mfaRequired: user.mfaRequired,
+        roles: session.roles,
+        lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
+      }}
+      initial={{
+        preferences: {
+          notifications: (preferences.notificationSettings ?? {}) as Record<string, boolean>,
+          privacy: (preferences.privacySettings ?? {}) as Record<string, boolean>,
+          theme: preferences.theme,
+        },
+        sessions: sessions.map((row) => ({
+          id: row.id,
+          current: row.id === session.sessionId,
+          ipAddress: row.ipAddress,
+          userAgent: row.userAgent,
+          createdAt: row.createdAt,
+          lastUsedAt: row.lastUsedAt,
+          expiresAt: row.expiresAt,
+        })),
+        devices: devices.map((row) => ({
+          id: row.id,
+          current: row.id === session.deviceId,
+          deviceName: row.deviceName,
+          browserInfo: row.browserInfo,
+          status: row.status,
+          lastActiveAt: row.lastActiveAt,
+        })),
+        groups,
+        reports,
+      }}
+    />
+  );
 }

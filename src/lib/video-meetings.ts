@@ -6,17 +6,30 @@ import { hasPermission, PERMISSIONS } from "@/lib/rbac";
 
 export type MeetingType = "video" | "voice";
 
-export async function loadAuthorizedGroup(user: { id: string; permissions: string[] }, groupId: string, type: MeetingType, action: "start" | "join") {
+export async function loadAuthorizedGroup(
+  user: { id: string; permissions: string[]; userType?: string },
+  groupId: string,
+  type: MeetingType,
+  action: "start" | "join",
+  meetingId?: string,
+) {
   const rows = await db.select().from(groups).where(and(eq(groups.id, groupId), isNull(groups.deletedAt))).limit(1);
   const group = rows[0];
   if (!group || group.status !== "active") throw new ApiError("GROUP_NOT_FOUND", "Group not found.", 404);
   const membership = await db.select({ memberRole: groupMembers.memberRole }).from(groupMembers).where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, user.id), isNull(groupMembers.removedAt))).limit(1);
   const isAdmin = hasPermission(user.permissions, PERMISSIONS.groupsUpdate) || user.permissions.includes("*");
-  if (!membership[0] && !isAdmin) throw new ApiError("GROUP_MEMBERSHIP_REQUIRED", "You are not a member of this group.", 403);
+  const invited = action === "join" && meetingId
+    ? (await db.select({ id: videoMeetingParticipants.id }).from(videoMeetingParticipants).where(and(eq(videoMeetingParticipants.meetingId, meetingId), eq(videoMeetingParticipants.userId, user.id), eq(videoMeetingParticipants.status, "invited"))).limit(1)).length > 0
+    : false;
+  if (!membership[0] && !isAdmin && !invited) throw new ApiError("GROUP_MEMBERSHIP_REQUIRED", "You are not a member of this group.", 403);
   if (type === "video" && !group.videoCallsEnabled && !isAdmin) throw new ApiError("VIDEO_CALLS_DISABLED", "Video calls are disabled for this group.", 403);
   if (type === "voice" && !group.voiceCallsEnabled && !isAdmin) throw new ApiError("VOICE_CALLS_DISABLED", "Voice calls are disabled for this group.", 403);
   const policy = action === "start" ? group.callStartPermission : group.callJoinPermission;
-  const allowed = isAdmin || policy === "group_members" || (policy === "staff_and_admin" && ["admin", "teacher", "staff", "counselor"].includes((user as { userType?: string }).userType ?? ""));
+  const allowed = isAdmin ||
+    (policy === "group_members" && Boolean(membership[0])) ||
+    (policy === "admins_and_members" && Boolean(membership[0])) ||
+    (policy === "invited_members" && (Boolean(membership[0]) || invited)) ||
+    (policy === "staff_and_admin" && ["admin", "teacher", "staff", "counselor"].includes(user.userType ?? ""));
   if (!allowed) throw new ApiError("CALL_PERMISSION_DENIED", `You are not authorized to ${action} this conference.`, 403);
   return { group, membership: membership[0] ?? null, isAdmin };
 }

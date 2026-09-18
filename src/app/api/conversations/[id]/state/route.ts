@@ -56,8 +56,8 @@ export const POST = route(async (req: NextRequest, meta, ctx: Ctx) => {
   }
 
   if (action === "delivered" || action === "read") {
-    const messageIds = stringArray(body, "messageIds") ?? [];
-    const targetIds =
+    const messageIds = stringArray(body, "messageIds", { maxItems: 500 }) ?? [];
+    const requestedIds =
       messageIds.length > 0
         ? messageIds
         : (
@@ -69,6 +69,15 @@ export const POST = route(async (req: NextRequest, meta, ctx: Ctx) => {
               .limit(500)
           ).map((row) => row.id);
 
+    if (requestedIds.length === 0) return jsonOk({ ok: true, acknowledged: 0 }, meta);
+
+    // Never allow a receipt request to mutate message state outside this channel.
+    const targetIds = (
+      await db
+        .select({ id: messages.id })
+        .from(messages)
+        .where(and(eq(messages.conversationId, id), ne(messages.senderId, session.id), inArray(messages.id, requestedIds)))
+    ).map((row) => row.id);
     if (targetIds.length === 0) return jsonOk({ ok: true, acknowledged: 0 }, meta);
 
     if (action === "delivered") {

@@ -1,6 +1,5 @@
 /** GET/PUT /api/admin/settings — platform policy switches (super admin only writes). */
 import { NextRequest } from "next/server";
-import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { platformSettings } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
@@ -68,6 +67,5 @@ export const PUT = route(async (req: NextRequest, meta) => {
     correlationId: meta.requestId,
   });
 
-  void eq;
   return jsonOk({ ok: true, settings: await getSettings() }, meta);
 });

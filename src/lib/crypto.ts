@@ -18,6 +18,7 @@ import {
   scryptSync,
   timingSafeEqual,
 } from "node:crypto";
+import bcrypt from "bcryptjs";
 
 /* ─────────────────────────── tokens & hashes ─────────────────────────── */
 
@@ -39,37 +40,32 @@ export function hmacSha1(key: Buffer, data: Buffer): Buffer {
 
 /* ─────────────────────────── passwords ─────────────────────────── */
 
-const SCRYPT_N = 16384;
-const SCRYPT_R = 8;
-const SCRYPT_P = 1;
-const KEY_LEN = 64;
+const BCRYPT_COST = 12;
+const LEGACY_SCRYPT_N = 16384;
+const LEGACY_SCRYPT_R = 8;
+const LEGACY_SCRYPT_P = 1;
+const LEGACY_KEY_LEN = 64;
 
 export function hashPassword(password: string): string {
-  const salt = randomBytes(16);
-  const derived = scryptSync(password.normalize("NFKC"), salt, KEY_LEN, {
-    N: SCRYPT_N,
-    r: SCRYPT_R,
-    p: SCRYPT_P,
-    maxmem: 128 * 1024 * 1024,
-  });
-  return `scrypt$${SCRYPT_N}$${SCRYPT_R}$${SCRYPT_P}$${salt.toString("base64")}$${derived.toString("base64")}`;
+  return bcrypt.hashSync(password.normalize("NFKC"), BCRYPT_COST);
 }
 
 export function verifyPassword(password: string, stored: string): boolean {
   try {
+    if (stored.startsWith("$2")) return bcrypt.compareSync(password.normalize("NFKC"), stored);
+    // One-way compatibility path for existing records; callers must immediately rehash.
     const [scheme, n, r, p, saltB64, hashB64] = stored.split("$");
-    if (scheme !== "scrypt") return false;
-    const derived = scryptSync(password.normalize("NFKC"), Buffer.from(saltB64, "base64"), KEY_LEN, {
-      N: Number(n),
-      r: Number(r),
-      p: Number(p),
-      maxmem: 128 * 1024 * 1024,
-    });
+    if (scheme !== "scrypt" || Number(n) !== LEGACY_SCRYPT_N || Number(r) !== LEGACY_SCRYPT_R || Number(p) !== LEGACY_SCRYPT_P) return false;
+    const derived = scryptSync(password.normalize("NFKC"), Buffer.from(saltB64, "base64"), LEGACY_KEY_LEN, { N: LEGACY_SCRYPT_N, r: LEGACY_SCRYPT_R, p: LEGACY_SCRYPT_P, maxmem: 128 * 1024 * 1024 });
     const expected = Buffer.from(hashB64, "base64");
     return derived.length === expected.length && timingSafeEqual(derived, expected);
   } catch {
     return false;
   }
+}
+
+export function needsPasswordRehash(stored: string): boolean {
+  return !stored.startsWith("$2b$") || !stored.startsWith(`$2b$${BCRYPT_COST}$`);
 }
 
 /**
@@ -100,13 +96,15 @@ export function passwordIssues(password: string): string[] {
 
 /* ─────────────────────────── secrets at rest (AES-256-GCM) ─────────────────────────── */
 
+const devMasterSecret = randomBytes(32).toString("hex");
+const devMasterSalt = randomBytes(16).toString("hex");
+
 function masterKey(): Buffer {
-  const secret =
-    process.env.ENCRYPTION_MASTER_KEY ??
-    process.env.DATABASE_URL ??
-    "globebridge-local-development-master-secret";
-  const salt = process.env.ENCRYPTION_MASTER_SALT ?? "globebridge.master.salt.v1";
-  return scryptSync(secret, salt, 32, { N: 4096, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
+  const secret = process.env.ENCRYPTION_MASTER_KEY;
+  if (!secret && process.env.NODE_ENV === "production") throw new Error("ENCRYPTION_MASTER_KEY must be configured in production");
+  const devSecret = secret ?? devMasterSecret;
+  const salt = process.env.ENCRYPTION_MASTER_SALT ?? devMasterSalt;
+  return scryptSync(devSecret, salt, 32, { N: 4096, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
 }
 
 export function encryptSecret(plain: string): string {

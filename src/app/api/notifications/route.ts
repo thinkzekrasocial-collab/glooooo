@@ -1,6 +1,6 @@
 /** GET/POST /api/notifications — in-app notification inbox. */
 import { NextRequest } from "next/server";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
@@ -39,6 +39,5 @@ export const POST = route(async (req: NextRequest, meta) => {
   }
 
   const unread = await unreadNotificationCount(session.id);
-  void sql;
   return jsonOk({ ok: true, unreadCount: unread }, meta);
 });

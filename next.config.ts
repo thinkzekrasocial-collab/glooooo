@@ -8,7 +8,11 @@ const nextConfig: NextConfig = {
     return [{
       source: "/(.*)",
       headers: [
-        { key: "Content-Security-Policy", value: `frame-src 'self' ${jitsi}; script-src 'self' ${jitsi}; connect-src 'self' ${jitsi} wss://${new URL(jitsi).hostname}${api ? ` ${api}` : ""}; media-src 'self' blob: ${jitsi}` },
+        { key: "Content-Security-Policy", value: `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'self' ${jitsi}; script-src 'self' ${jitsi}; connect-src 'self' ${jitsi} wss://${new URL(jitsi).hostname}${api ? ` ${api}` : ""}; media-src 'self' blob: ${jitsi}; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'` },
+        { key: "X-Frame-Options", value: "DENY" },
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
         { key: "Permissions-Policy", value: `camera=(self "${jitsi}"), microphone=(self "${jitsi}"), display-capture=(self "${jitsi}")` },
       ],
     }];

@@ -25,21 +25,26 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
   // the old hard-coded Worker fallback caused successful logins to lose their
   // cookie on the subsequent `/api/users/me` request and created a login loop.
   const apiBase = apiBaseUrl();
-  const token = typeof window !== "undefined" ? window.localStorage.getItem("gb_token") : null;
   const response = await fetch(`${apiBase}${path}`, {
     method: options.method ?? "GET",
     headers: {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
     signal: options.signal,
-    credentials: apiBase ? "include" : "same-origin",
+    credentials: "include",
     cache: "no-store",
   });
 
   const text = await response.text();
-  const payload = text ? (JSON.parse(text) as unknown) : {};
+  let payload: unknown = {};
+  if (text) {
+    try {
+      payload = JSON.parse(text) as unknown;
+    } catch {
+      throw new ApiClientError("INVALID_RESPONSE", "The server returned an invalid response.", response.status);
+    }
+  }
 
   if (!response.ok) {
     const envelope = payload as {
@@ -59,8 +64,10 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
 
 /** Resolve the API origin used by browser-only service calls. */
 export function apiBaseUrl(): string {
-  const configuredBase =
-    process.env.NODE_ENV === "production" ? undefined : process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  // NEXT_PUBLIC_* values are inlined into the browser bundle at build time,
+  // including production builds. Ignoring this value in production sends the
+  // login request to the frontend host instead of the configured Worker API.
+  const configuredBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
   return configuredBase ? configuredBase.replace(/\/$/, "") : "";
 }
 

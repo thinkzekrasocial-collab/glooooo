@@ -44,11 +44,10 @@ export function LoginForm({
         setError("Enter your email and password.");
         return;
       }
-      const result = await apiFetch<{ mfaRequired: boolean; next: string; token?: string }>("/api/auth/login", {
+      const result = await apiFetch<{ mfaRequired: boolean; next: string }>("/api/auth/login", {
         method: "POST",
         body: { email: submittedEmail, password: submittedPassword },
       });
-      if (result.token && typeof window !== "undefined") window.localStorage.setItem("gb_token", result.token);
       if (result.mfaRequired) {
         setMfaRequired(true);
         return;

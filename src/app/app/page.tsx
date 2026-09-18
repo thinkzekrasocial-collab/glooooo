@@ -16,17 +16,17 @@ export default function MessengerPage() {
     Promise.all([
       apiFetch<RemoteUser>("/api/users/me"),
       apiFetch<{ conversations: ConversationSummary[] }>("/api/conversations"),
-      apiFetch<{ users?: DirectoryEntry[] }>("/api/directory").catch(() => ({ users: [] })),
+      apiFetch<{ people?: DirectoryEntry[] }>("/api/directory").catch(() => ({ people: [] })),
     ]).then(([remotePayload, channels, people]) => {
       const remoteUser = (remotePayload as RemoteUser & { user?: RemoteUser; roles?: string[] }).user
         ? { ...(remotePayload as RemoteUser & { user: RemoteUser }).user, permissions: (remotePayload as { permissions?: string[] }).permissions, groups: (remotePayload as { groups?: RemoteUser["groups"] }).groups }
         : remotePayload;
       setUser(remoteUser);
       setConversations(channels.conversations);
-      setDirectory(people.users ?? []);
+      setDirectory(people.people ?? []);
     }).catch(() => setUser(null));
   }, []);
 
-  if (!user) return <main className="p-8 text-slate-300">Connecting to Cloudflare…</main>;
+  if (!user) return <main className="p-8 text-slate-300">Connecting to the secure messenger…</main>;
   return <Messenger me={{ id: user.id, name: user.preferredName || user.firstName || user.email, permissions: user.permissions ?? [] }} myGroups={user.groups ?? []} initialConversations={conversations} initialDirectory={directory} initialConversationId={conversations[0]?.id ?? null} />;
 }

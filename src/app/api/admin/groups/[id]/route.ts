@@ -92,12 +92,11 @@ export const PATCH = route(async (req: NextRequest, meta, ctx: Ctx) => {
     updates.voiceVideoEnabled = voiceVideoEnabled;
     fields.push("voiceVideoEnabled");
   }
-  for (const [key, allowed] of [
-    ["videoCallsEnabled", "boolean"], ["voiceCallsEnabled", "boolean"], ["screenSharingEnabled", "boolean"],
+  for (const key of [
+    "videoCallsEnabled", "voiceCallsEnabled", "screenSharingEnabled",
   ] as const) {
     const value = boolValue(body, key);
     if (value !== undefined) { updates[key] = value; fields.push(key); }
-    void allowed;
   }
   const callStartPermission = enumValue(body, "callStartPermission", ["admin_only", "staff_and_admin", "group_members"] as const);
   if (callStartPermission !== undefined) { updates.callStartPermission = callStartPermission; fields.push("callStartPermission"); }

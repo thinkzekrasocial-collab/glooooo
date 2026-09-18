@@ -10,13 +10,15 @@ import { NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { platformSettings } from "@/db/schema";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, requirePermission } from "@/lib/auth";
+import { PERMISSIONS } from "@/lib/rbac";
 import { enforceRateLimit, jsonOk, route } from "@/lib/http";
 import { ensureBootstrap } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
 
 export const POST = route(async (_req: NextRequest, meta) => {
+  await requirePermission(PERMISSIONS.settingsManage);
   enforceRateLimit(`setup:${meta.ip}`, 5, 60_000);
   const result = await ensureBootstrap();
   return jsonOk({ ok: true, ...result }, meta);

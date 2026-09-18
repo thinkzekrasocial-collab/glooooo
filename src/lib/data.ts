@@ -102,10 +102,14 @@ export async function getDirectory(
               select 1 from group_members gm
               join group_members mine on mine.group_id = gm.group_id and mine.user_id = ${viewer.id}
               where gm.user_id = ${users.id}
+                and gm.removed_at is null
+                and mine.removed_at is null
             ) or exists (
               select 1 from conversation_members cm
               join conversation_members mine on mine.conversation_id = cm.conversation_id and mine.user_id = ${viewer.id}
               where cm.user_id = ${users.id}
+                and cm.left_at is null
+                and mine.left_at is null
             )`,
       ),
     )
@@ -448,7 +452,6 @@ export async function listTypingUsers(conversationId: string, excludeUserId: str
   const rows = await db
     .select({
       userId: typingIndicators.userId,
-      name: sql<string>`${users.preferredName} is null or ${users.preferredName} = ''`,
       firstName: users.firstName,
       lastName: users.lastName,
       preferredName: users.preferredName,
@@ -723,8 +726,12 @@ export async function myGroups(userId: string) {
 export async function userPreferencesFor(userId: string) {
   const rows = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId)).limit(1);
   if (rows[0]) return rows[0];
-  const inserted = await db.insert(userPreferences).values({ userId }).returning();
-  return inserted[0];
+  const inserted = await db.insert(userPreferences).values({ userId }).onConflictDoNothing().returning();
+  if (inserted[0]) return inserted[0];
+  // Another request created the row between our read and insert.
+  const concurrent = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId)).limit(1);
+  if (!concurrent[0]) throw new Error("User preferences could not be initialized");
+  return concurrent[0];
 }
 
 export async function listUserSessions(userId: string) {
@@ -868,6 +875,25 @@ export async function listReports(status?: string) {
     ...r,
     createdAt: r.createdAt.toISOString(),
     resolvedAt: r.resolvedAt ? r.resolvedAt.toISOString() : null,
+  }));
+}
+
+export async function listReportsForUser(userId: string) {
+  const rows = await db
+    .select({
+      id: reports.id,
+      reason: reports.reason,
+      status: reports.status,
+      resolutionNotes: reports.resolutionNotes,
+      createdAt: reports.createdAt,
+    })
+    .from(reports)
+    .where(eq(reports.reporterId, userId))
+    .orderBy(desc(reports.createdAt))
+    .limit(100);
+  return rows.map((row) => ({
+    ...row,
+    createdAt: row.createdAt.toISOString(),
   }));
 }
 

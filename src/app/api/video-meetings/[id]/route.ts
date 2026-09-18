@@ -15,7 +15,7 @@ type Ctx = { params: Promise<{ id: string }> };
 async function authorizeMeeting(id: string) {
   const user = await requireUser();
   const { meeting, group } = await loadMeeting(id);
-  const auth = await loadAuthorizedGroup(user, group.id, meeting.meetingType as "video" | "voice", "join");
+  const auth = await loadAuthorizedGroup(user, group.id, meeting.meetingType as "video" | "voice", "join", meeting.id);
   return { user, meeting, group, auth };
 }
 

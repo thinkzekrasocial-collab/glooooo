@@ -149,11 +149,10 @@ export async function ensureDeviceIdentity(): Promise<DeviceIdentity> {
   const identity = await loadOrCreateIdentity();
 
   const apiBase = apiBaseUrl();
-  const token = typeof window !== "undefined" ? window.localStorage.getItem("gb_token") : null;
   const response = await fetch(`${apiBase}/api/keys`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    credentials: apiBase ? "include" : "same-origin",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({
       deviceName: identity.deviceName,
       browserInfo: typeof navigator === "undefined" ? null : navigator.userAgent.slice(0, 190),

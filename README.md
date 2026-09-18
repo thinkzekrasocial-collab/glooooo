@@ -109,6 +109,13 @@ variable before starting or building Next.js:
 NEXT_PUBLIC_API_BASE_URL=https://demoo.shihab309kye.workers.dev npm run dev
 ```
 
+For a deployed frontend, set the same `NEXT_PUBLIC_API_BASE_URL` in the
+frontend host's production environment before rebuilding. Set the Worker
+secret/config variable `FRONTEND_ORIGIN` to the exact frontend origin (for
+example, `https://messenger.example.com`) so browser preflight and API
+responses are allowed. Leave `NEXT_PUBLIC_API_BASE_URL` empty only when the
+Next.js API routes and database are deployed on the same origin.
+
 Cloudflare test accounts provisioned in D1:
 
 | Account | Password | Role |

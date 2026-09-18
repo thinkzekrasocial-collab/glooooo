@@ -88,7 +88,16 @@ export const PATCH = route(async (req: NextRequest, meta) => {
   if (campusLocation !== undefined) updates.campusLocation = campusLocation;
   const dateOfBirth = str(body, "dateOfBirth", { max: 32 });
   if (dateOfBirth !== undefined) updates.dateOfBirth = dateOfBirth;
-  if (body.emergencyContact !== undefined) updates.emergencyContact = body.emergencyContact;
+  if (body.emergencyContact !== undefined) {
+    if (typeof body.emergencyContact !== "object" || body.emergencyContact === null || Array.isArray(body.emergencyContact)) {
+      throw new ApiError("VALIDATION_TYPE", "emergencyContact must be an object.", 422);
+    }
+    const emergency = body.emergencyContact as Record<string, unknown>;
+    if (Object.keys(emergency).length > 8 || Object.values(emergency).some((value) => typeof value !== "string" || value.length > 160)) {
+      throw new ApiError("VALIDATION_RANGE", "emergencyContact contains invalid fields.", 422);
+    }
+    updates.emergencyContact = emergency;
+  }
 
   const updated = await db.update(users).set(updates).where(eq(users.id, session.id)).returning();
   const user = updated[0];

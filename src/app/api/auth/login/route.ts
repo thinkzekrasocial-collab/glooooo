@@ -5,8 +5,8 @@ import { db } from "@/db";
 import { userPreferences, users } from "@/db/schema";
 import { recordAudit, recordSecurityEvent } from "@/lib/audit";
 import { createSession, getSessionUser, setSessionCookie } from "@/lib/auth";
-import { verifyPassword } from "@/lib/crypto";
-import { ApiError, enforceRateLimit, jsonOk, rateLimitHeaders, readJson, route, str } from "@/lib/http";
+import { needsPasswordRehash, hashPassword, verifyPassword } from "@/lib/crypto";
+import { ApiError, enforceRateLimit, jsonOk, readJson, route, str } from "@/lib/http";
 import { ensureBootstrap } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ const LOCKOUT_MS = 15 * 60 * 1000;
 export const POST = route(async (req: NextRequest, meta) => {
   await ensureBootstrap();
 
-  const limit = enforceRateLimit(`login:ip:${meta.ip}`, 20, 5 * 60_000);
+  enforceRateLimit(`login:ip:${meta.ip}`, 20, 5 * 60_000);
   const body = await readJson(req);
   const email = str(body, "email", { required: true, max: 254, label: "Email" })!.toLowerCase();
   const password = str(body, "password", { required: true, max: 200, label: "Password" })!;
@@ -111,6 +111,9 @@ export const POST = route(async (req: NextRequest, meta) => {
     .update(users)
     .set({ failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date(), updatedAt: new Date() })
     .where(eq(users.id, user.id));
+  if (needsPasswordRehash(user.passwordHash)) {
+    await db.update(users).set({ passwordHash: hashPassword(password), updatedAt: new Date() }).where(eq(users.id, user.id));
+  }
 
   await db.insert(userPreferences).values({ userId: user.id }).onConflictDoNothing();
 
@@ -169,5 +172,3 @@ export const GET = route(async (_req: NextRequest, meta) => {
   if (!session) return jsonOk({ authenticated: false }, meta);
   return jsonOk({ authenticated: true, user: session }, meta);
 });
-
-

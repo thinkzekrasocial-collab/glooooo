@@ -136,6 +136,11 @@ export function Messenger({
   const plaintextRef = useRef<Map<string, string>>(new Map());
   const keyMaterialRef = useRef<Map<string, string>>(new Map());
   const typingSentRef = useRef(0);
+  const typingTimerRef = useRef<number | null>(null);
+  const loadGenerationRef = useRef(0);
+  const messagePollInFlightRef = useRef(false);
+  const sendingMessageRef = useRef(false);
+  const attachmentUrlsRef = useRef<Record<string, string>>({});
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const activeConversation = useMemo(
@@ -292,21 +297,38 @@ export function Messenger({
     setMessages((previous) => {
       const map = new Map(previous.map((message) => [message.id, message]));
       for (const message of incoming) {
-        const existing = map.get(message.id);
-        map.set(message.id, existing ? { ...existing, ...message } : message);
+        const existing = map.get(message.id) ?? [...map.values()].find(
+          (candidate) => candidate.clientMessageId === message.clientMessageId,
+        );
+        if (existing && existing.id !== message.id) map.delete(existing.id);
+        map.set(message.id, existing ? { ...existing, ...message, plaintext: message.plaintext ?? existing.plaintext } : message);
       }
-      return [...map.values()].sort((a, b) => a.serverTimestamp.localeCompare(b.serverTimestamp));
+      return [...map.values()].sort((a, b) =>
+        a.serverTimestamp.localeCompare(b.serverTimestamp) || a.id.localeCompare(b.id),
+      );
     });
   }, []);
 
   const loadMessages = useCallback(
-    async (conversationId: string) => {
+    async (conversationId: string, generation?: number) => {
       const payload = await apiFetch<MessagesResponse>(
         `/api/conversations/${conversationId}/messages?markRead=1`,
       );
       const decrypted = await decryptBatch(payload.messages);
+      if (generation !== undefined && generation !== loadGenerationRef.current) return;
       const mapped = new Map(decrypted.map((message) => [message.id, message]));
-      setMessages([...mapped.values()]);
+      setMessages((previous) => {
+        const localOnly = previous.filter(
+          (message) =>
+            message.conversationId === conversationId &&
+            (message.localPending === true || message.localFailed === true) &&
+            !mapped.has(message.id) &&
+            ![...mapped.values()].some((server) => server.clientMessageId === message.clientMessageId),
+        );
+        return [...mapped.values(), ...localOnly].sort((a, b) =>
+          a.serverTimestamp.localeCompare(b.serverTimestamp) || a.id.localeCompare(b.id),
+        );
+      });
       setTyping(payload.typing);
     },
     [decryptBatch],
@@ -314,6 +336,7 @@ export function Messenger({
 
   const loadConversation = useCallback(
     async (conversationId: string) => {
+      const generation = ++loadGenerationRef.current;
       setActiveId(conversationId);
       setDetail(null);
       setMessages([]);
@@ -321,16 +344,19 @@ export function Messenger({
       setMobilePane("thread");
       try {
         const { keys, ready } = await resolveKeys(conversationId);
+        if (generation !== loadGenerationRef.current) return;
         setKeyState({
           status: ready ? "ready" : "waiting",
           pending: keys.pendingDevices.length,
           message: ready ? undefined : "Waiting for a key-holding device to grant this browser access.",
         });
         const detailPayload = await apiFetch<ConversationDetail>(`/api/conversations/${conversationId}`);
+        if (generation !== loadGenerationRef.current) return;
         setDetail(detailPayload);
         setTyping(detailPayload.typing);
-        if (ready) await loadMessages(conversationId);
+        if (ready) await loadMessages(conversationId, generation);
       } catch (caught) {
+        if (generation !== loadGenerationRef.current) return;
         setError(caught instanceof Error ? caught.message : "This channel could not be opened.");
         setKeyState({ status: "error", pending: 0 });
       }
@@ -355,22 +381,30 @@ export function Messenger({
   useEffect(() => {
     if (!activeId) return;
     const timer = window.setInterval(async () => {
+      if (messagePollInFlightRef.current) return;
+      const generation = loadGenerationRef.current;
+      messagePollInFlightRef.current = true;
       try {
         if (keyState.status === "waiting" || keyState.status === "error") {
           const { ready } = await resolveKeys(activeId);
+          if (generation !== loadGenerationRef.current) return;
           if (ready) {
             setKeyState({ status: "ready", pending: 0 });
-            await loadMessages(activeId);
+            await loadMessages(activeId, generation);
           }
           return;
         }
-        const cursor = messages.length > 0 ? messages[messages.length - 1].serverTimestamp : null;
+        const serverMessages = messages.filter((message) => !message.localPending && !message.localFailed);
+        const cursor = serverMessages.length > 0 ? serverMessages[serverMessages.length - 1].serverTimestamp : null;
         const query = cursor ? `?after=${encodeURIComponent(cursor)}&markRead=1` : "?markRead=1";
         const payload = await apiFetch<MessagesResponse>(`/api/conversations/${activeId}/messages${query}`);
+        if (generation !== loadGenerationRef.current) return;
         if (payload.messages.length > 0) mergeMessages(await decryptBatch(payload.messages));
         setTyping(payload.typing);
       } catch {
         /* keep polling */
+      } finally {
+        messagePollInFlightRef.current = false;
       }
     }, 3500);
     return () => window.clearInterval(timer);
@@ -392,9 +426,14 @@ export function Messenger({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, activeId]);
 
+  useEffect(() => () => {
+    for (const url of Object.values(attachmentUrlsRef.current)) URL.revokeObjectURL(url);
+  }, []);
+
   async function sendMessage() {
     const text = draft.trim();
-    if (!text || !activeId) return;
+    if (!text || !activeId || sendingMessageRef.current) return;
+    sendingMessageRef.current = true;
     const clientMessageId = localId();
     const localKey = `local:${clientMessageId}`;
     setDraft("");
@@ -424,7 +463,9 @@ export function Messenger({
         localPending: true,
       };
       mergeMessages([optimistic]);
-      void apiFetch(`/api/conversations/${activeId}/state`, { method: "POST", body: { action: "stop_typing" } });
+      void apiFetch(`/api/conversations/${activeId}/state`, { method: "POST", body: { action: "stop_typing" } }).catch(
+        () => undefined,
+      );
 
       const result = await apiFetch<{ messageId: string; serverTimestamp: string }>(
         `/api/conversations/${activeId}/messages`,
@@ -457,6 +498,8 @@ export function Messenger({
         ),
       );
       setError(caught instanceof ApiClientError ? caught.message : "The message could not be delivered.");
+    } finally {
+      sendingMessageRef.current = false;
     }
   }
 
@@ -502,7 +545,9 @@ export function Messenger({
       );
       const bytes = await decryptFile(message.conversationId, payload.storedPayload);
       const blob = new Blob([bytes as unknown as BlobPart], { type: payload.mimeType });
-      setAttachmentUrls((previous) => ({ ...previous, [message.attachment!.id]: URL.createObjectURL(blob) }));
+      const url = URL.createObjectURL(blob);
+      attachmentUrlsRef.current[message.attachment.id] = url;
+      setAttachmentUrls((previous) => ({ ...previous, [message.attachment!.id]: url }));
     } catch {
       setError("The attachment could not be decrypted on this device.");
     }
@@ -544,6 +589,13 @@ export function Messenger({
   function handleDraftChange(value: string) {
     setDraft(value);
     if (!activeId) return;
+    if (typingTimerRef.current !== null) window.clearTimeout(typingTimerRef.current);
+    if (!value.trim()) {
+      void apiFetch(`/api/conversations/${activeId}/state`, { method: "POST", body: { action: "stop_typing" } }).catch(
+        () => undefined,
+      );
+      return;
+    }
     const now = Date.now();
     if (now - typingSentRef.current > 3000) {
       typingSentRef.current = now;
@@ -551,6 +603,13 @@ export function Messenger({
         () => undefined,
       );
     }
+    const conversationId = activeId;
+    typingTimerRef.current = window.setTimeout(() => {
+      void apiFetch(`/api/conversations/${conversationId}/state`, { method: "POST", body: { action: "stop_typing" } }).catch(
+        () => undefined,
+      );
+      typingTimerRef.current = null;
+    }, 4000);
   }
 
   async function submitReport(event: React.FormEvent<HTMLFormElement>) {
@@ -576,14 +635,14 @@ export function Messenger({
   }
 
   return (
-    <div className="flex h-[calc(100vh-57px)] min-h-0">
+    <div className="messenger-layout flex min-h-0">
       {/* ── conversation list ── */}
       <section
-        className={`flex w-full min-w-0 flex-col border-r border-white/10 lg:w-80 lg:shrink-0 ${
+        className={`conversation-panel flex w-full min-w-0 flex-col border-r border-white/10 lg:shrink-0 ${
           mobilePane === "thread" ? "hidden lg:flex" : "flex"
         }`}
       >
-        <div className="space-y-3 border-b border-white/10 p-3">
+        <div className="conversation-toolbar space-y-3 border-b border-white/10">
           <div className="flex gap-2">
             <input
               className="field"
@@ -612,7 +671,7 @@ export function Messenger({
           </div> : null}
         </div>
 
-        <ul className="min-h-0 flex-1 overflow-y-auto">
+        <ul className="conversation-list min-h-0 flex-1 overflow-y-auto">
           {filteredConversations.length === 0 ? (
             <li className="p-4 text-sm text-slate-500">
               No channels yet. Use <strong className="text-slate-300">New</strong> to open an encrypted
@@ -669,7 +728,7 @@ export function Messenger({
       </section>
 
       {/* ── thread ── */}
-      <section className={`flex min-w-0 flex-1 flex-col ${mobilePane === "list" ? "hidden lg:flex" : "flex"}`}>
+      <section className={`chat-panel flex min-w-0 flex-1 flex-col ${mobilePane === "list" ? "hidden lg:flex" : "flex"}`}>
         {error ? (
           <div role="alert" className="flex items-center gap-2 border-b border-rose-400/30 bg-rose-500/10 px-4 py-2 text-sm text-rose-200">
             <span className="flex-1">{error}</span>
@@ -697,7 +756,7 @@ export function Messenger({
           </div>
         ) : (
           <>
-            <header className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
+            <header className="chat-header flex items-center gap-3 border-b border-white/10">
               <button
                 type="button"
                 className="btn-quiet lg:hidden"
@@ -778,7 +837,7 @@ export function Messenger({
               </div>
             ) : null}
 
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+            <div className="message-scroll min-h-0 flex-1 space-y-3 overflow-y-auto">
               {messages.length === 0 ? (
                 <p className="text-center text-sm text-slate-500">
                   No messages yet. Say hello — the first message is encrypted on your device.
@@ -876,7 +935,7 @@ export function Messenger({
             ) : null}
 
             <form
-              className="flex items-end gap-2 border-t border-white/10 px-3 py-3"
+              className="composer flex items-end gap-2 border-t border-white/10"
               onSubmit={(event) => {
                 event.preventDefault();
                 void sendMessage();

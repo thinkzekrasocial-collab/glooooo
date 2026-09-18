@@ -188,6 +188,29 @@ export const POST = route(async (req: NextRequest, meta, ctx: Ctx) => {
   const contentType = enumValue(body, "contentType", ["text", "file", "image", "audio"] as const) ?? "text";
   const replyToId = str(body, "replyToId", { max: 64 });
   const attachmentBody = body.attachment;
+  const validatedAttachment = attachmentBody && typeof attachmentBody === "object"
+    ? (() => {
+        const att = attachmentBody as Record<string, unknown>;
+        const fileName = str(att, "fileName", { required: true, max: 200, label: "File name" })!;
+        const mimeType = str(att, "mimeType", { required: true, max: 160, label: "Mime type" })!.toLowerCase();
+        const storedPayload = str(att, "storedPayload", { required: true, max: 1_400_000, label: "Encrypted file" })!;
+        const checksum = str(att, "checksumSha256", { max: 128 }) ?? sha256(storedPayload);
+        if (!new RegExp("^[^/\\\\x00-\\\\x1f\\\\x7f]+$").test(fileName) || fileName === "." || fileName === "..") {
+          throw new ApiError("VALIDATION_FILENAME", "File name is invalid.", 422);
+        }
+        if (!/^[a-f0-9]{64}$/i.test(checksum) || checksum.toLowerCase() !== sha256(storedPayload)) {
+          throw new ApiError("VALIDATION_CHECKSUM", "Attachment checksum is invalid.", 422);
+        }
+        if (!new RegExp("^(image|audio|video|application|text)/[a-z0-9.+-]+$").test(mimeType)) {
+          throw new ApiError("VALIDATION_MIME_TYPE", "Attachment media type is invalid.", 422);
+        }
+        const size = intValue(att, "fileSizeBytes", { min: 1, max: 20_000_000 }) ?? storedPayload.length;
+        return { fileName, mimeType, storedPayload, checksum, size };
+      })()
+    : null;
+  if (validatedAttachment && !fileSharingAllowed) {
+    throw new ApiError("POLICY_FILE_SHARING_DISABLED", "File sharing is disabled for this channel.", 403);
+  }
 
   const existing = await db
     .select()
@@ -199,31 +222,37 @@ export const POST = route(async (req: NextRequest, meta, ctx: Ctx) => {
   }
 
   const messageId = uuid();
-  await db.insert(messages).values({
-    id: messageId,
-    conversationId: id,
-    senderId: session.id,
-    senderDeviceId: session.deviceId ?? "unknown-device",
-    clientMessageId,
-    contentType,
-    ciphertext,
-    ciphertextIv,
-    contentHash: sha256(ciphertext + ciphertextIv),
-    replyToId: replyToId ?? null,
-    status: "sent",
-  });
+  try {
+    await db.insert(messages).values({
+      id: messageId,
+      conversationId: id,
+      senderId: session.id,
+      senderDeviceId: session.deviceId ?? "unknown-device",
+      clientMessageId,
+      contentType,
+      ciphertext,
+      ciphertextIv,
+      contentHash: sha256(ciphertext + ciphertextIv),
+      replyToId: replyToId ?? null,
+      status: "sent",
+    });
+  } catch (caught) {
+    const errorCode = typeof caught === "object" && caught !== null && "code" in caught
+      ? (caught as { code?: unknown }).code
+      : undefined;
+    if (errorCode !== "23505") throw caught;
+    const duplicate = await db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(and(eq(messages.conversationId, id), eq(messages.clientMessageId, clientMessageId)))
+      .limit(1);
+    if (!duplicate[0]) throw caught;
+    return jsonOk({ messageId: duplicate[0].id, deduplicated: true }, meta);
+  }
 
   let attachmentRecord: { id: string; fileName: string } | null = null;
-  if (attachmentBody && typeof attachmentBody === "object") {
-    if (!fileSharingAllowed) {
-      throw new ApiError("POLICY_FILE_SHARING_DISABLED", "File sharing is disabled for this channel.", 403);
-    }
-    const att = attachmentBody as Record<string, unknown>;
-    const fileName = str(att, "fileName", { required: true, max: 200, label: "File name" })!;
-    const mimeType = str(att, "mimeType", { required: true, max: 160, label: "Mime type" })!;
-    const storedPayload = str(att, "storedPayload", { required: true, max: 1_400_000, label: "Encrypted file" })!;
-    const checksum = str(att, "checksumSha256", { max: 128 }) ?? sha256(storedPayload);
-    const size = intValue(att, "fileSizeBytes", { min: 1, max: 20_000_000 }) ?? storedPayload.length;
+  if (validatedAttachment) {
+    const { fileName, mimeType, storedPayload, checksum, size } = validatedAttachment;
     const attachmentId = uuid();
     await db.insert(attachments).values({
       id: attachmentId,
@@ -234,8 +263,9 @@ export const POST = route(async (req: NextRequest, meta, ctx: Ctx) => {
       mimeType,
       r2Key: `encrypted/${messageId}/${attachmentId}`,
       storedPayload,
-      scanStatus: "clean",
-      scanCompletedAt: new Date(),
+      // The server cannot inspect client-side ciphertext. Do not claim AV scanning.
+      scanStatus: "client_encrypted",
+      scanCompletedAt: null,
       checksumSha256: checksum,
     });
     attachmentRecord = { id: attachmentId, fileName };
@@ -278,11 +308,11 @@ export const POST = route(async (req: NextRequest, meta, ctx: Ctx) => {
   });
 
   const muted = await db
-    .select({ mutedUntil: conversationMembers.mutedUntil })
+    .select({ userId: conversationMembers.userId, mutedUntil: conversationMembers.mutedUntil })
     .from(conversationMembers)
     .where(and(eq(conversationMembers.conversationId, id), isNull(conversationMembers.leftAt)));
   const mutedUsers = new Set(
-    muted.filter((m) => m.mutedUntil && m.mutedUntil.getTime() > Date.now()).map(() => ""),
+    muted.filter((m) => m.mutedUntil && m.mutedUntil.getTime() > Date.now()).map((m) => m.userId),
   );
 
   for (const userId of recipientsByUser.keys()) {
