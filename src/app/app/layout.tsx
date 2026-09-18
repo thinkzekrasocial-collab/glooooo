@@ -1,6 +1,6 @@
 "use client";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/shell/AppShell";
 import { ApiClientError, apiFetch } from "@/lib/api-client";
@@ -13,7 +13,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const [sessionError, setSessionError] = useState<string | null>(null);
   const router = useRouter();
 
-  async function loadSession() {
+  const loadSession = useCallback(async () => {
     setLoading(true);
     setSessionError(null);
     try {
@@ -27,11 +27,11 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [router]);
 
   useEffect(() => {
     void loadSession();
-  }, [router]);
+  }, [loadSession]);
 
   if (loading || !me) {
     return (
