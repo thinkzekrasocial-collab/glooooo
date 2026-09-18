@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
     return [{
       source: "/(.*)",
       headers: [
-        { key: "Content-Security-Policy", value: `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'self' ${jitsi}; script-src 'self' ${jitsi}; connect-src 'self' ${jitsi} wss://${new URL(jitsi).hostname}${api ? ` ${api}` : ""}; media-src 'self' blob: ${jitsi}; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'` },
+        { key: "Content-Security-Policy", value: `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'self' ${jitsi}; script-src 'self' 'unsafe-inline' ${jitsi}; connect-src 'self' ${jitsi} wss://${new URL(jitsi).hostname}${api ? ` ${api}` : ""}; media-src 'self' blob: ${jitsi}; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'` },
         { key: "X-Frame-Options", value: "DENY" },
         { key: "X-Content-Type-Options", value: "nosniff" },
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
