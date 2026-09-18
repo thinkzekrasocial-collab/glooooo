@@ -103,7 +103,12 @@ export function apiBaseUrl(): string {
   // including production builds. Ignoring this value in production sends the
   // login request to the frontend host instead of the configured Worker API.
   const configuredBase =
-    process.env.NEXT_PUBLIC_CLOUDFLARE_API_BASE_URL?.trim() || process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+    process.env.NEXT_PUBLIC_CLOUDFLARE_API_BASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
+    // Keep the production build pointed at the existing Worker even when
+    // Vercel has not injected a NEXT_PUBLIC_* variable. Deployments that use
+    // same-origin API routes can still opt in by setting either variable.
+    "https://demoo.shihab309kye.workers.dev";
   return configuredBase ? configuredBase.replace(/\/$/, "") : "";
 }
 
