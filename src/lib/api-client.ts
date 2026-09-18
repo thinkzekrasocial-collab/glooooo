@@ -80,7 +80,8 @@ export function apiBaseUrl(): string {
   // NEXT_PUBLIC_* values are inlined into the browser bundle at build time,
   // including production builds. Ignoring this value in production sends the
   // login request to the frontend host instead of the configured Worker API.
-  const configuredBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  const configuredBase =
+    process.env.NEXT_PUBLIC_CLOUDFLARE_API_BASE_URL?.trim() || process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
   return configuredBase ? configuredBase.replace(/\/$/, "") : "";
 }
 
