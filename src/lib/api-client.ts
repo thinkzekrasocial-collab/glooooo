@@ -54,7 +54,8 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
   // cookie on the subsequent `/api/users/me` request and created a login loop.
   const apiBase = apiBaseUrl();
   const bearerToken = getBearerToken();
-  const response = await fetch(`${apiBase}${path}`, {
+  const requestPath = apiBase ? `/api/worker${path}` : path;
+  const response = await fetch(`${apiBase}${requestPath}`, {
     method: options.method ?? "GET",
     headers: {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
