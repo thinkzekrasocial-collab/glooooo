@@ -6,6 +6,29 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const startedAt = Date.now();
+  const externalApiBase = (
+    process.env.NEXT_PUBLIC_CLOUDFLARE_API_BASE_URL?.trim() || process.env.NEXT_PUBLIC_API_BASE_URL?.trim()
+  )?.replace(/\/$/, "");
+
+  if (externalApiBase) {
+    try {
+      const upstream = await fetch(`${externalApiBase}/health`, { cache: "no-store" });
+      const payload = (await upstream.json()) as Record<string, unknown>;
+      return Response.json(
+        {
+          ...payload,
+          service: "globebridge-messenger",
+          checks: { ...(payload.checks as Record<string, unknown> | undefined), database: "external-worker" },
+          latencyMs: Date.now() - startedAt,
+          timestamp: new Date().toISOString(),
+        },
+        { status: upstream.ok ? 200 : 502, headers: { "Cache-Control": "no-store" } },
+      );
+    } catch (error) {
+      console.error("[health] external API check failed", error);
+    }
+  }
+
   try {
     const result = await db.execute(sql`
       select
