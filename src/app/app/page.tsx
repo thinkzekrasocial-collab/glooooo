@@ -5,6 +5,8 @@ import { Messenger } from "@/components/messenger/Messenger";
 import { apiFetch } from "@/lib/api-client";
 import type { ConversationSummary, DirectoryEntry } from "@/lib/data";
 
+export const dynamic = "force-dynamic";
+
 type RemoteUser = { id: string; email: string; firstName?: string; preferredName?: string; permissions?: string[]; groups?: Array<{ id: string; name: string; memberRole?: string }> };
 
 export default function MessengerPage() {
