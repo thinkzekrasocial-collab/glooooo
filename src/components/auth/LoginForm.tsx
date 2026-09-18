@@ -95,7 +95,7 @@ export function LoginForm({
       ) : null}
 
       {!mfaRequired ? (
-          <form method="post" onSubmit={submitCredentials} className="panel space-y-4 p-5" noValidate>
+          <form action="/login/submit" method="post" onSubmit={submitCredentials} className="panel space-y-4 p-5" noValidate>
           <div>
             <label className="label" htmlFor="email">
               School email
