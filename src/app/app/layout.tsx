@@ -18,6 +18,6 @@ async function initialSession() {
   }
 }
 
-export default function AppLayout({ children }: { children: ReactNode }) {
-  return <AppSessionLayout initialMe={initialSession()}>{children}</AppSessionLayout>;
+export default async function AppLayout({ children }: { children: ReactNode }) {
+  return <AppSessionLayout initialMe={await initialSession()}>{children}</AppSessionLayout>;
 }
