@@ -54,7 +54,11 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
   // keep the app's same-origin API behavior.
   const apiBase = apiBaseUrl();
   const bearerToken = getBearerToken();
-  const requestPath = apiBase ? `${apiBase}${path}` : path;
+  // A native form submit cannot write sessionStorage before redirecting to
+  // `/app`. In that one bootstrap case, use the same-origin proxy so its
+  // HttpOnly `gb_session_token` cookie can be forwarded to the Worker. Once
+  // the client has a bearer token, continue using the Worker directly.
+  const requestPath = apiBase ? (bearerToken ? `${apiBase}${path}` : `/api/worker${path}`) : path;
   const response = await fetch(requestPath, {
     method: options.method ?? "GET",
     headers: {
@@ -63,7 +67,7 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
     signal: options.signal,
-    credentials: apiBase ? "include" : "same-origin",
+    credentials: "include",
     cache: "no-store",
   });
 
