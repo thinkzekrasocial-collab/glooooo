@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
     const api = (
       process.env.NEXT_PUBLIC_CLOUDFLARE_API_BASE_URL ??
       process.env.NEXT_PUBLIC_API_BASE_URL ??
-      ""
+      "https://demoo.shihab309kye.workers.dev"
     ).replace(/\/$/, "");
     return [{
       source: "/(.*)",
