@@ -3,8 +3,6 @@ import { LoginForm } from "@/components/auth/LoginForm";
 // Production never ships usernames or passwords in the client bundle.
 const CLOUDFLARE_ACCOUNTS: never[] = [];
 
-export const dynamic = "force-dynamic";
-
 export default function LoginPage() {
   return (
     <main id="main" className="mx-auto flex min-h-screen w-full max-w-6xl flex-col items-center justify-center gap-10 px-6 py-14 lg:flex-row lg:items-stretch lg:gap-16">
