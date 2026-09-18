@@ -77,13 +77,6 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
 
 /** Resolve the API origin used by browser-only service calls. */
 export function apiBaseUrl(): string {
-  // The Vercel deployment owns these Next.js API routes and the httpOnly
-  // session cookie. Ignore legacy Worker overrides on Vercel so a stale
-  // project variable cannot send login to a different origin.
-  if (typeof window !== "undefined" && window.location.hostname.endsWith(".vercel.app")) {
-    return "";
-  }
-
   // NEXT_PUBLIC_* values are inlined into the browser bundle at build time,
   // including production builds. Ignoring this value in production sends the
   // login request to the frontend host instead of the configured Worker API.
