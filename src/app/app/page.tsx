@@ -1,34 +1,36 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { Messenger } from "@/components/messenger/Messenger";
-import { apiFetch } from "@/lib/api-client";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import MessengerPageClient from "./MessengerPageClient";
 import type { ConversationSummary, DirectoryEntry } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
 type RemoteUser = { id: string; email: string; firstName?: string; preferredName?: string; permissions?: string[]; groups?: Array<{ id: string; name: string; memberRole?: string }> };
 
-export default function MessengerPage() {
-  const [user, setUser] = useState<RemoteUser | null>(null);
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
+async function workerGet<T>(path: string): Promise<T | null> {
+  const token = (await cookies()).get("gb_session_token")?.value;
+  if (!token) return null;
+  try {
+    const response = await fetch(`https://demoo.shihab309kye.workers.dev${path}`, { headers: { Authorization: `Bearer ${decodeURIComponent(token)}` }, cache: "no-store" });
+    return response.ok ? await response.json() as T : null;
+  } catch { return null; }
+}
 
-  useEffect(() => {
-    Promise.all([
-      apiFetch<RemoteUser>("/api/users/me"),
-      apiFetch<{ conversations: ConversationSummary[] }>("/api/conversations"),
-      apiFetch<{ people?: DirectoryEntry[] }>("/api/directory").catch(() => ({ people: [] })),
-    ]).then(([remotePayload, channels, people]) => {
-      const remoteUser = (remotePayload as RemoteUser & { user?: RemoteUser; roles?: string[] }).user
-        ? { ...(remotePayload as RemoteUser & { user: RemoteUser }).user, permissions: (remotePayload as { permissions?: string[] }).permissions, groups: (remotePayload as { groups?: RemoteUser["groups"] }).groups }
-        : remotePayload;
-      setUser(remoteUser);
-      setConversations(channels.conversations);
-      setDirectory(people.people ?? []);
-    }).catch(() => setUser(null));
-  }, []);
-
-  if (!user) return <main className="p-8 text-slate-300">Connecting to the secure messenger…</main>;
-  return <Messenger me={{ id: user.id, name: user.preferredName || user.firstName || user.email, permissions: user.permissions ?? [] }} myGroups={user.groups ?? []} initialConversations={conversations} initialDirectory={directory} initialConversationId={conversations[0]?.id ?? null} />;
+export default async function MessengerPage() {
+  const [user, channels, directoryResponse] = await Promise.all([
+    workerGet<RemoteUser>("/api/users/me"),
+    workerGet<{ conversations: ConversationSummary[] }>("/api/conversations"),
+    workerGet<{ users?: Array<{ id: string; email: string; name: string; userType: string }> }>("/api/directory"),
+  ]);
+  if (!user || !channels) redirect("/login");
+  const directory: DirectoryEntry[] = (directoryResponse?.users ?? []).map((entry) => ({
+    ...entry,
+    status: "active",
+    department: null,
+    gradeClass: null,
+    program: null,
+    roleNames: [],
+    sharedGroups: [],
+  }));
+  return <MessengerPageClient user={user} conversations={channels.conversations ?? []} directory={directory} />;
 }
