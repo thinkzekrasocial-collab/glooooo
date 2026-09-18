@@ -56,7 +56,6 @@ export function LoginForm({
         return;
       }
       router.replace("/app");
-      router.refresh();
     } catch (caught) {
       const message =
         caught instanceof ApiClientError

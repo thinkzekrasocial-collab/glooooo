@@ -4,7 +4,12 @@ const cors = (request, env) => {
   // HTML client. Reflecting arbitrary origins would make credentialed API
   // requests unsafe.
   const origin = request.headers.get("origin");
-  const allowedOrigin = env?.FRONTEND_ORIGIN || "https://demoo.shihab309kye.workers.dev";
+  const allowedOrigins = new Set([
+    env?.FRONTEND_ORIGIN,
+    "https://glooooo.vercel.app",
+    "https://demoo.shihab309kye.workers.dev",
+  ].filter(Boolean));
+  const allowedOrigin = origin && allowedOrigins.has(origin) ? origin : [...allowedOrigins][0];
   return {
     "access-control-allow-origin": origin === allowedOrigin ? origin : allowedOrigin,
     "access-control-allow-headers": "Content-Type, Authorization",
@@ -75,7 +80,7 @@ const worker = { async fetch(request, env) {
     if (!user || !(await verifyPassword(String(b.password || ""), user.password_hash))) return json({ error: "Invalid email or password." }, 401);
     const session = await issue(env, user.id);
     const payload = await session.clone().json();
-    return json({ mfaRequired: false, next: "/app", user: { id: user.id, email: user.email } }, 200, { "set-cookie": `gb_session=${payload.token}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=43200` });
+    return json({ mfaRequired: false, next: "/app", token: payload.token, user: { id: user.id, email: user.email } }, 200, { "set-cookie": `gb_session=${payload.token}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=43200` });
   }
   const user = await userFrom(request, env); if (!user) return json({ error: "Authentication required." }, 401);
   if ((path === "/me" || path === "/users/me") && request.method === "GET") {

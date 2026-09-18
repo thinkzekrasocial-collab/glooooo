@@ -117,7 +117,6 @@ export function AppShell({
     } finally {
       setLegacyBearerToken(null);
       router.replace("/login");
-      router.refresh();
     }
   }
 

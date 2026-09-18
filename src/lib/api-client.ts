@@ -19,13 +19,32 @@ type Options = {
   signal?: AbortSignal;
 };
 
-// Compatibility for an already deployed Worker that still returns a bearer
-// token while the cookie-based deployment rolls out. Keep this only in memory:
-// it must never be persisted in localStorage or exposed to unrelated tabs.
+// Compatibility for the Worker bearer-token session. Keep the token scoped to
+// this browser tab so a route transition or reload can restore the session
+// without exposing it to unrelated tabs or persisting it beyond the tab.
 let legacyBearerToken: string | null = null;
+const SESSION_TOKEN_KEY = "gb_session_token";
 
 export function setLegacyBearerToken(token: string | null): void {
   legacyBearerToken = token;
+  if (typeof window === "undefined") return;
+  try {
+    if (token) window.sessionStorage.setItem(SESSION_TOKEN_KEY, token);
+    else window.sessionStorage.removeItem(SESSION_TOKEN_KEY);
+  } catch {
+    // Private browsing or restricted storage can fail; in-memory auth still works.
+  }
+}
+
+function getBearerToken(): string | null {
+  if (legacyBearerToken) return legacyBearerToken;
+  if (typeof window === "undefined") return null;
+  try {
+    legacyBearerToken = window.sessionStorage.getItem(SESSION_TOKEN_KEY);
+  } catch {
+    legacyBearerToken = null;
+  }
+  return legacyBearerToken;
 }
 
 export async function apiFetch<T>(path: string, options: Options = {}): Promise<T> {
@@ -34,18 +53,19 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
   // the old hard-coded Worker fallback caused successful logins to lose their
   // cookie on the subsequent `/api/users/me` request and created a login loop.
   const apiBase = apiBaseUrl();
+  const bearerToken = getBearerToken();
   const response = await fetch(`${apiBase}${path}`, {
     method: options.method ?? "GET",
     headers: {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...(legacyBearerToken ? { Authorization: `Bearer ${legacyBearerToken}` } : {}),
+      ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
     signal: options.signal,
     // The Cloudflare Worker API is a bearer-token API when configured as an
     // external origin. Omitting credentials avoids wildcard-CORS rejection;
     // same-origin Next.js requests still use the httpOnly session cookie.
-    credentials: apiBase ? "omit" : "same-origin",
+    credentials: apiBase && bearerToken ? "omit" : apiBase ? "include" : "same-origin",
     cache: "no-store",
   });
 
