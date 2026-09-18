@@ -55,7 +55,7 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
   const apiBase = apiBaseUrl();
   const bearerToken = getBearerToken();
   const requestPath = apiBase ? `/api/worker${path}` : path;
-  const response = await fetch(`${apiBase}${requestPath}`, {
+  const response = await fetch(requestPath, {
     method: options.method ?? "GET",
     headers: {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
@@ -66,7 +66,7 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
     // The Cloudflare Worker API is a bearer-token API when configured as an
     // external origin. Omitting credentials avoids wildcard-CORS rejection;
     // same-origin Next.js requests still use the httpOnly session cookie.
-    credentials: apiBase ? "omit" : "same-origin",
+    credentials: "same-origin",
     cache: "no-store",
   });
 
