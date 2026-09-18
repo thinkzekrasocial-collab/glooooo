@@ -97,7 +97,7 @@ export function LoginForm({
       ) : null}
 
       {!mfaRequired ? (
-        <form onSubmit={submitCredentials} className="panel space-y-4 p-5" noValidate>
+          <form method="post" onSubmit={submitCredentials} className="panel space-y-4 p-5" noValidate>
           <div>
             <label className="label" htmlFor="email">
               School email
@@ -139,7 +139,7 @@ export function LoginForm({
           </p>
         </form>
       ) : (
-        <form onSubmit={submitMfa} className="panel space-y-4 p-5" noValidate>
+        <form method="post" onSubmit={submitMfa} className="panel space-y-4 p-5" noValidate>
           <div>
             <label className="label" htmlFor="code">
               Six-digit code from your authenticator app

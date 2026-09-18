@@ -27,6 +27,11 @@ self.addEventListener("fetch", (event) => {
   // Never cache API responses: they carry ciphertext, policies and session data.
   if (url.pathname.startsWith("/api/")) return;
 
+  // Next App Router documents and RSC flight requests must stay network-owned.
+  // Serving a cached document/fallback here can terminate hydration with a
+  // partial RSC stream and hide the real failure behind the login page.
+  if (request.mode === "navigate" || request.headers.has("RSC") || request.headers.has("Next-Router-State-Tree")) return;
+
   event.respondWith(
     fetch(request)
       .then((response) => {
