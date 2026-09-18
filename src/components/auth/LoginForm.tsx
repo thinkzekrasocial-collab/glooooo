@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ApiClientError, apiFetch, setLegacyBearerToken } from "@/lib/api-client";
 
@@ -22,6 +23,7 @@ export function LoginForm({
   sandboxAccounts: SandboxAccount[];
   sandboxPassword: string;
 }) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -53,7 +55,7 @@ export function LoginForm({
         setMfaRequired(true);
         return;
       }
-      window.location.href = "/app";
+      router.replace("/app");
     } catch (caught) {
       const message =
         caught instanceof ApiClientError
@@ -71,7 +73,7 @@ export function LoginForm({
     setError(null);
     try {
       await apiFetch("/api/auth/mfa", { method: "POST", body: { code } });
-      window.location.href = "/app";
+      router.replace("/app");
     } catch (caught) {
       const message =
         caught instanceof ApiClientError ? FEEDBACK[caught.code] ?? caught.message : "Verification failed.";
