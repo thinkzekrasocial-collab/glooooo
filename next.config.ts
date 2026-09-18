@@ -1,10 +1,18 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Prevent production navigations from receiving partial Flight streams.
+  // A closed partial stream is surfaced by React as error #412 instead of
+  // falling back to a full document navigation.
+  cacheComponents: false,
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   async headers() {
     const jitsi = (process.env.JITSI_BASE_URL?.trim() || "https://meet.example.com").replace(/\/$/, "");
-    const api = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
+    const api = (
+      process.env.NEXT_PUBLIC_CLOUDFLARE_API_BASE_URL ??
+      process.env.NEXT_PUBLIC_API_BASE_URL ??
+      ""
+    ).replace(/\/$/, "");
     return [{
       source: "/(.*)",
       headers: [
