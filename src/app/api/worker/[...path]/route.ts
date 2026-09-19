@@ -15,7 +15,9 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
   const { path } = await context.params;
   const upstreamUrl = `${workerBase()}/${path.join("/")}${new URL(request.url).search}`;
   const headers = new Headers();
-  const authorization = request.headers.get("authorization") || request.cookies.get(SESSION_COOKIE)?.value;
+  const authorizationHeader = request.headers.get("authorization");
+  const cookieToken = request.cookies.get(SESSION_COOKIE)?.value;
+  const authorization = authorizationHeader || (cookieToken ? `Bearer ${decodeURIComponent(cookieToken)}` : null);
   const contentType = request.headers.get("content-type");
   if (authorization) headers.set("authorization", authorization);
   if (contentType) headers.set("content-type", contentType);
