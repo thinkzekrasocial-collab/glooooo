@@ -54,6 +54,7 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
   // keep the app's same-origin API behavior.
   const apiBase = apiBaseUrl();
   const bearerToken = getBearerToken();
+  const usesExternalBearer = Boolean(apiBase && bearerToken);
   // A native form submit cannot write sessionStorage before redirecting to
   // `/app`. In that one bootstrap case, use the same-origin proxy so its
   // HttpOnly `gb_session_token` cookie can be forwarded to the Worker. Once
@@ -67,7 +68,11 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
     signal: options.signal,
-    credentials: "include",
+    // Cross-origin Worker requests authenticate with the bearer header. Do
+    // not attach cookies there: the Worker intentionally uses wildcard CORS,
+    // which browsers reject for credentialed requests. Native login bootstrap
+    // still uses the same-origin proxy and its HttpOnly cookie.
+    credentials: usesExternalBearer ? "omit" : "include",
     cache: "no-store",
   });
 
