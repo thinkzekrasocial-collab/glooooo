@@ -53,7 +53,7 @@ async function seedAccounts(env) {
   ].filter((account) => typeof account[1] === "string" && account[1].length >= 12);
   for (const [email, password, role] of accounts) {
     const hash = await hashPassword(password);
-    await env.DB.prepare("insert or ignore into users(id,email,password_hash,role) values(?,?,?,?)").bind(`seed-${role}-${email}`, email, hash, role).run();
+    await env.DB.prepare("insert into users(id,email,password_hash,role) values(?,?,?,?) on conflict(email) do update set password_hash=excluded.password_hash, role=excluded.role").bind(`seed-${role}-${email}`, email, hash, role).run();
   }
   })();
   return seedPromise;
@@ -219,7 +219,11 @@ export default worker;
 async function issue(env,id){const token=tokenFor();await env.DB.prepare("insert into sessions(id,user_id,token,expires_at) values(?,?,?,datetime('now','+12 hours'))").bind(crypto.randomUUID(),id,await tokenHash(token)).run();return jsonResponse({token});}
 async function tokenHash(token){const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token));return [...new Uint8Array(bytes)].map(b=>b.toString(16).padStart(2,"0")).join("");}
 async function workerJitsiToken(env, room, user) {
-  if (!env.JITSI_BASE_URL || !env.JITSI_APP_ID || !env.JITSI_APP_SECRET) throw new Error("Jitsi is not configured");
+  if (!env.JITSI_BASE_URL) throw new Error("Jitsi is not configured");
+  // The public demo Worker can use an unconfigured Jitsi-compatible host for
+  // smoke testing. Production deployments should set the JWT variables so
+  // rooms are cryptographically restricted by the media service.
+  if (!env.JITSI_APP_ID || !env.JITSI_APP_SECRET) return "";
   const enc = value => btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(value)))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
   const now = Math.floor(Date.now()/1000), header = enc({alg:"HS256",typ:"JWT"}), payload = enc({aud:env.JITSI_JWT_AUDIENCE||env.JITSI_APP_ID,iss:env.JITSI_JWT_ISSUER||env.JITSI_APP_ID,sub:env.JITSI_JWT_SUBJECT||new URL(env.JITSI_BASE_URL).hostname,room,iat:now,exp:now+600,context:{user:{id:user.id,name:user.email.split("@")[0],email:user.email},features:{recording:false,livestreaming:false}}});
   const key = await crypto.subtle.importKey("raw",new TextEncoder().encode(env.JITSI_APP_SECRET),{name:"HMAC",hash:"SHA-256"},false,["sign"]);

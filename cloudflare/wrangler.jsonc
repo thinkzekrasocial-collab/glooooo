@@ -4,6 +4,9 @@
   "account_id": "31bc12993ae04639246a2dd14279b297",
   "compatibility_date": "2026-09-17",
   "main": "worker.js",
+  "vars": {
+    "JITSI_BASE_URL": "https://meet.jit.si"
+  },
   "d1_databases": [
     {
       "binding": "DB",

@@ -22,13 +22,13 @@ CREATE TABLE IF NOT EXISTS video_meetings (
   meeting_type TEXT NOT NULL CHECK (meeting_type IN ('video', 'voice')),
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('scheduled', 'active', 'ended', 'cancelled')),
   title TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  ended_at TIMESTAMPTZ,
-  scheduled_start_at TIMESTAMPTZ,
-  scheduled_end_at TIMESTAMPTZ,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ended_at TEXT,
+  scheduled_start_at TEXT,
+  scheduled_end_at TEXT,
   ended_reason TEXT,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_video_meetings_group ON video_meetings(group_id);
 CREATE INDEX IF NOT EXISTS idx_video_meetings_creator ON video_meetings(created_by);
@@ -45,8 +45,8 @@ CREATE TABLE IF NOT EXISTS video_meeting_participants (
   joined_at TIMESTAMPTZ,
   left_at TIMESTAMPTZ,
   status TEXT NOT NULL DEFAULT 'invited' CHECK (status IN ('invited', 'joined', 'left', 'declined')),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (meeting_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS idx_video_participants_meeting ON video_meeting_participants(meeting_id);

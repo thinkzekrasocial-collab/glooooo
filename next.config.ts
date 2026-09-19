@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   cacheComponents: false,
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   async headers() {
-    const jitsi = (process.env.JITSI_BASE_URL?.trim() || "https://meet.example.com").replace(/\/$/, "");
+    const jitsi = (process.env.JITSI_BASE_URL?.trim() || "https://meet.jit.si").replace(/\/$/, "");
     const api = (
       process.env.NEXT_PUBLIC_CLOUDFLARE_API_BASE_URL ??
       process.env.NEXT_PUBLIC_API_BASE_URL ??
